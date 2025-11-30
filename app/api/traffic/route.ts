@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
 import prisma from "@/app/lib/prisma";
-import { getTrafficFromGoogleMaps, getWazeDeepLink, getWazeRouteDeepLink } from "@/app/lib/services/traffic";
+import { 
+  getTrafficFromTomTom, 
+  getTrafficFromGoogleMaps, 
+  getWazeDeepLink, 
+  getWazeRouteDeepLink 
+} from "@/app/lib/services/traffic";
 
 export async function GET(request: NextRequest) {
   try {
@@ -58,22 +63,52 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Si on a une position utilisateur et une destination, essayer Google Maps
-    if (userLocation && destinationLat && destinationLng) {
-      const googleTraffic = await getTrafficFromGoogleMaps(
-        userLocation.lat,
-        userLocation.lng,
-        destinationLat,
-        destinationLng,
-        destination
-      );
-
-      if (googleTraffic) {
-        return NextResponse.json({
-          ...googleTraffic,
-          wazeLinks,
+    // Si on a une position utilisateur, essayer TomTom en priorité
+    if (userLocation) {
+      // Si on a une destination avec coordonnées, utiliser TomTom
+      if (destinationLat && destinationLng) {
+        console.log("[Traffic API] Tentative d'appel TomTom avec:", {
+          origin: `${userLocation.lat},${userLocation.lng}`,
+          destination: `${destinationLat},${destinationLng}`,
         });
+        
+        // Essayer TomTom en premier (gratuit, 2500 requêtes/jour)
+        const tomtomTraffic = await getTrafficFromTomTom(
+          userLocation.lat,
+          userLocation.lng,
+          destinationLat,
+          destinationLng,
+          destination
+        );
+
+        if (tomtomTraffic) {
+          console.log("[Traffic API] ✅ Données TomTom récupérées avec succès");
+          return NextResponse.json({
+            ...tomtomTraffic,
+            wazeLinks,
+          });
+        } else {
+          console.log("[Traffic API] ⚠️ TomTom n'a pas retourné de données");
+        }
+
+        // Fallback sur Google Maps si TomTom n'est pas disponible
+        const googleTraffic = await getTrafficFromGoogleMaps(
+          userLocation.lat,
+          userLocation.lng,
+          destinationLat,
+          destinationLng,
+          destination
+        );
+
+        if (googleTraffic) {
+          return NextResponse.json({
+            ...googleTraffic,
+            wazeLinks,
+          });
+        }
       }
+      // Si pas de destination mais qu'on a la position, on peut toujours retourner les liens Waze
+      // Les données de trafic nécessitent une destination
     }
 
     // Fallback : simulation si Google Maps n'est pas disponible ou si pas de coordonnées

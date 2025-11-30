@@ -32,7 +32,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    console.log("[API Weather] Récupération météo pour:", latitude, longitude);
     const weather = await getWeather(latitude, longitude);
+    console.log(
+      "[API Weather] Météo récupérée:",
+      JSON.stringify(weather, null, 2)
+    );
+
     const response = formatWeatherResponse(weather, question);
 
     // Adapter le format pour la page météo
@@ -44,6 +50,11 @@ export async function GET(request: NextRequest) {
         lon: longitude,
       },
     };
+
+    console.log(
+      "[API Weather] Données envoyées:",
+      JSON.stringify(weatherData, null, 2)
+    );
 
     return NextResponse.json({
       success: true,

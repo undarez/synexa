@@ -42,6 +42,10 @@ model User {
   learning            UserLearning[]
   activities          UserActivity[]
   healthMetrics       HealthMetric[]
+  bills               Bill[]
+  incomes             Income[]
+  expenses            Expense[]
+  budgets             Budget[]
 }
 
 model Account {
@@ -391,4 +395,134 @@ model HealthMetric {
 
   @@index([userId, type, recordedAt])
   @@index([userId, recordedAt])
+}
+
+enum BillCategory {
+  UTILITIES      // EDF, GDF, eau
+  INTERNET       // Internet, téléphone
+  INSURANCE      // Assurance habitation, auto
+  SUBSCRIPTION   // Netflix, Spotify, etc.
+  RENT           // Loyer
+  TAXES          // Impôts
+  HEALTH         // Mutuelle, frais médicaux
+  TRANSPORT      // Transport, carburant
+  EDUCATION      // Frais scolaires
+  OTHER
+}
+
+enum BillStatus {
+  PENDING        // En attente de paiement
+  PAID           // Payée
+  OVERDUE        // En retard
+  CANCELLED      // Annulée
+}
+
+model Bill {
+  id              String       @id @default(cuid())
+  userId          String
+  title           String       // Ex: "Facture EDF"
+  description     String?
+  category        BillCategory @default(OTHER)
+  amount          Float
+  currency        String       @default("EUR")
+  dueDate         DateTime     // Date d'échéance
+  paidDate        DateTime?    // Date de paiement
+  status          BillStatus    @default(PENDING)
+  provider        String?       // Ex: "EDF", "Orange", etc.
+  reference       String?       // Numéro de facture
+  reminderDays    Int          @default(3) // Nombre de jours avant l'échéance pour rappel
+  isRecurring     Boolean      @default(false) // Facture récurrente
+  recurrenceRule  String?      // "MONTHLY", "YEARLY", etc.
+  metadata        Json?        // Données supplémentaires
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, dueDate])
+  @@index([userId, category])
+  @@index([status, dueDate])
+}
+
+enum ExpenseCategory {
+  FOOD          // Alimentation
+  TRANSPORT     // Transport, carburant
+  SHOPPING      // Courses, shopping
+  ENTERTAINMENT // Loisirs, sorties
+  HEALTH        // Santé, pharmacie
+  EDUCATION     // Formation, cours
+  CLOTHING      // Vêtements
+  HOME          // Maison, décoration
+  PERSONAL      // Soins personnels
+  OTHER
+}
+
+enum ExpenseFrequency {
+  DAILY         // Quotidien
+  WEEKLY        // Hebdomadaire
+  MONTHLY       // Mensuel
+  ONE_TIME      // Unique
+}
+
+model Income {
+  id              String   @id @default(cuid())
+  userId          String
+  title           String   // Ex: "Salaire", "Freelance"
+  amount          Float
+  currency        String   @default("EUR")
+  frequency       String   @default("MONTHLY") // MONTHLY, WEEKLY, YEARLY, ONE_TIME
+  startDate       DateTime? // Date de début (pour salaire mensuel)
+  endDate         DateTime? // Date de fin (optionnel)
+  isActive        Boolean  @default(true)
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+  @@index([userId, frequency])
+}
+
+model Expense {
+  id              String           @id @default(cuid())
+  userId          String
+  title           String
+  description     String?
+  category        ExpenseCategory  @default(OTHER)
+  amount          Float
+  currency        String           @default("EUR")
+  frequency       ExpenseFrequency @default(ONE_TIME)
+  date            DateTime         @default(now())
+  isRecurring     Boolean          @default(false)
+  recurrenceRule  String?         // "DAILY", "WEEKLY", "MONTHLY"
+  metadata        Json?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@index([userId, category])
+  @@index([userId, frequency])
+}
+
+model Budget {
+  id              String           @id @default(cuid())
+  userId          String
+  title           String           // Ex: "Budget Alimentation"
+  category        ExpenseCategory  // Catégorie de dépense
+  amount          Float            // Montant du budget
+  currency        String           @default("EUR")
+  period          String           @default("MONTHLY") // MONTHLY, WEEKLY, YEARLY
+  startDate       DateTime         @default(now())
+  endDate         DateTime?        // Date de fin (optionnel)
+  isActive        Boolean          @default(true)
+  alertThreshold  Float?           @default(80) // Pourcentage pour alerte (ex: 80% = alerte à 80%)
+  metadata        Json?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+  @@index([userId, category])
+  @@index([userId, period])
 }

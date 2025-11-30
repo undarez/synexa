@@ -1,7 +1,7 @@
 /**
  * Service météo utilisant Météo-France (gratuit, officiel pour la France)
  * Fallback: Open-Meteo (gratuit, international, pas besoin de clé)
- * 
+ *
  * Météo-France est l'API officielle française, parfaite pour la géolocalisation en France
  */
 
@@ -30,7 +30,7 @@ export interface WeatherForecast {
 /**
  * Récupère la météo actuelle et les prévisions
  * Utilise Open-Meteo par défaut (gratuit, fiable, fonctionne parfaitement pour la France)
- * 
+ *
  * Open-Meteo est une excellente solution gratuite qui :
  * - Fonctionne sans clé API
  * - Fournit des données précises pour la France
@@ -50,7 +50,7 @@ export async function getWeather(
 
 /**
  * Utilise Open-Meteo (gratuit, pas besoin de clé API, excellent pour la France)
- * 
+ *
  * Open-Meteo utilise les modèles météo européens (ECMWF) qui sont très précis pour la France.
  * L'API est gratuite, sans limite de requêtes, et supporte parfaitement la géolocalisation.
  */
@@ -60,15 +60,27 @@ async function getWeatherOpenMeteo(
   days: number = 5
 ): Promise<WeatherForecast> {
   try {
-    // Utiliser le modèle européen (ECMWF) pour une meilleure précision en France
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=Europe/Paris&forecast_days=${days}&models=ecmwf_ifs04`;
+    // Utiliser Open-Meteo (sans modèle spécifique pour éviter les erreurs)
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=${days}`;
 
+    console.log("[Weather] Appel Open-Meteo:", url);
     const response = await fetch(url);
+
     if (!response.ok) {
-      throw new Error("Erreur API Open-Meteo");
+      const errorText = await response.text();
+      console.error(
+        "[Weather] Erreur API Open-Meteo:",
+        response.status,
+        errorText
+      );
+      throw new Error(`Erreur API Open-Meteo: ${response.status}`);
     }
 
     const data = await response.json();
+    console.log(
+      "[Weather] Données Open-Meteo reçues:",
+      JSON.stringify(data, null, 2)
+    );
 
     // Convertir weather_code en description
     const weatherDescriptions: Record<number, string> = {
@@ -102,26 +114,40 @@ async function getWeatherOpenMeteo(
       99: "orage avec grêle forte",
     };
 
-    const currentCode = data.current.weather_code;
-    const currentTemp = Math.round(data.current.temperature_2m);
+    // Vérifier que les données sont présentes
+    if (!data.current || !data.daily) {
+      console.error("[Weather] Structure de données invalide:", data);
+      throw new Error("Structure de données Open-Meteo invalide");
+    }
 
-    return {
+    const currentCode = data.current.weather_code || 0;
+    const currentTemp = Math.round(data.current.temperature_2m || 0);
+
+    const weatherResult = {
       current: {
         temperature: currentTemp,
         description: weatherDescriptions[currentCode] || "conditions météo",
-        humidity: Math.round(data.current.relative_humidity_2m),
-        windSpeed: Math.round(data.current.wind_speed_10m * 3.6), // m/s -> km/h
+        humidity: Math.round(data.current.relative_humidity_2m || 0),
+        windSpeed: Math.round((data.current.wind_speed_10m || 0) * 3.6), // m/s -> km/h
         date: new Date().toISOString(),
       },
-      forecast: data.daily.time.map((date: string, index: number) => ({
+      forecast: (data.daily.time || []).map((date: string, index: number) => ({
         date,
         temperature: {
-          min: Math.round(data.daily.temperature_2m_min[index]),
-          max: Math.round(data.daily.temperature_2m_max[index]),
+          min: Math.round(data.daily.temperature_2m_min[index] || 0),
+          max: Math.round(data.daily.temperature_2m_max[index] || 0),
         },
-        description: weatherDescriptions[data.daily.weather_code[index]] || "conditions météo",
+        description:
+          weatherDescriptions[data.daily.weather_code[index] || 0] ||
+          "conditions météo",
       })),
     };
+
+    console.log(
+      "[Weather] Données formatées:",
+      JSON.stringify(weatherResult, null, 2)
+    );
+    return weatherResult;
   } catch (error) {
     console.error("[Weather] Erreur Open-Meteo:", error);
     throw new Error("Impossible de récupérer la météo");
@@ -149,18 +175,19 @@ export function formatWeatherResponse(
   }
 
   // Détecter si on demande pour aujourd'hui
-  if (lowerQuestion.includes("aujourd'hui") || lowerQuestion.includes("maintenant")) {
+  if (
+    lowerQuestion.includes("aujourd'hui") ||
+    lowerQuestion.includes("maintenant")
+  ) {
     return `Aujourd'hui, il fait ${weather.current.temperature} degrés, avec ${weather.current.description}. L'humidité est de ${weather.current.humidity}% et le vent souffle à ${weather.current.windSpeed} km/h.`;
   }
 
   // Réponse par défaut (aujourd'hui + prévisions)
   let response = `Actuellement, il fait ${weather.current.temperature} degrés, avec ${weather.current.description}. `;
-  
+
   if (weather.forecast.length > 0) {
     response += `Pour demain, prévu entre ${weather.forecast[0].temperature.min} et ${weather.forecast[0].temperature.max} degrés, avec ${weather.forecast[0].description}.`;
   }
 
   return response;
 }
-
-

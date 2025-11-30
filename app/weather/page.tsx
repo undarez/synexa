@@ -86,6 +86,10 @@ export default function WeatherPage() {
           });
           return;
         }
+        // Essayer aussi homeAddress si disponible
+        if (data.profile?.homeAddress) {
+          // On pourrait géocoder l'adresse, mais pour l'instant on utilise une position par défaut
+        }
       }
 
       // Sinon, utiliser la géolocalisation du navigateur
@@ -98,57 +102,100 @@ export default function WeatherPage() {
             });
           },
           (error) => {
-            console.error("Erreur géolocalisation:", error);
-            setError("Impossible d'obtenir votre position. Veuillez configurer votre adresse dans le profil.");
+            // Si la géolocalisation est refusée, utiliser une position par défaut (Paris)
+            // L'utilisateur pourra toujours changer manuellement
+            console.warn("Géolocalisation refusée, utilisation de la position par défaut (Paris)");
+            setUserLocation({
+              lat: 48.8566, // Paris par défaut
+              lng: 2.3522,
+            });
+            setError("Géolocalisation refusée. Affichage de la météo pour Paris. Vous pouvez autoriser la géolocalisation dans les paramètres de votre navigateur.");
             setLoading(false);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
           }
         );
       } else {
-        setError("La géolocalisation n'est pas supportée par votre navigateur.");
+        // Si la géolocalisation n'est pas supportée, utiliser Paris par défaut
+        setUserLocation({
+          lat: 48.8566,
+          lng: 2.3522,
+        });
+        setError("La géolocalisation n'est pas supportée. Affichage de la météo pour Paris.");
         setLoading(false);
       }
     } catch (err) {
       console.error("Erreur récupération position:", err);
-      setError("Erreur lors de la récupération de votre position.");
+      // En cas d'erreur, utiliser Paris par défaut
+      setUserLocation({
+        lat: 48.8566,
+        lng: 2.3522,
+      });
+      setError("Erreur lors de la récupération de votre position. Affichage de la météo pour Paris.");
       setLoading(false);
     }
   };
 
   const fetchWeather = async () => {
-    if (!userLocation) return;
+    if (!userLocation) {
+      console.warn("Pas de position disponible pour récupérer la météo");
+      return;
+    }
 
     try {
       setLoading(true);
       setError(null);
+
+      console.log("Récupération météo pour:", userLocation);
 
       const response = await fetch(
         `/api/weather?lat=${userLocation.lat}&lon=${userLocation.lng}`
       );
 
       if (!response.ok) {
-        throw new Error("Erreur lors de la récupération de la météo");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Erreur lors de la récupération de la météo");
       }
 
       const data = await response.json();
+      console.log("Données météo reçues:", data);
+      
+      // Vérifier que les données sont bien présentes
+      if (!data.weather || !data.weather.current) {
+        console.error("Données météo invalides:", data);
+        throw new Error("Données météo invalides");
+      }
+
       // Adapter les données au format attendu
       const weatherData: WeatherData = {
-        current: data.weather.current,
-        forecast: data.weather.forecast.map((f: any) => ({
+        current: {
+          temperature: data.weather.current.temperature || 0,
+          humidity: data.weather.current.humidity || 0,
+          windSpeed: data.weather.current.windSpeed || 0,
+          description: data.weather.current.description || "Données non disponibles",
+          icon: data.weather.current.icon,
+        },
+        forecast: (data.weather.forecast || []).map((f: any) => ({
           date: f.date,
           temperature: typeof f.temperature === 'object' ? f.temperature : { min: f.temperature - 2, max: f.temperature + 2 },
-          description: f.description,
+          description: f.description || "Données non disponibles",
           icon: f.icon,
         })),
         location: {
-          name: "Votre position",
+          name: userLocation.lat === 48.8566 && userLocation.lng === 2.3522 ? "Paris (par défaut)" : "Votre position",
           lat: userLocation.lat,
           lon: userLocation.lng,
         },
       };
+      console.log("Données météo formatées:", weatherData);
       setWeather(weatherData);
       setLastUpdate(new Date());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur inconnue");
+      console.error("Erreur fetchWeather:", err);
+      setError(err instanceof Error ? err.message : "Erreur inconnue lors de la récupération de la météo");
     } finally {
       setLoading(false);
     }
@@ -222,7 +269,10 @@ export default function WeatherPage() {
                 <WeatherMap
                   latitude={userLocation.lat}
                   longitude={userLocation.lng}
-                  weather={weather as any}
+                  weather={weather ? {
+                    current: weather.current,
+                    forecast: weather.forecast,
+                  } : undefined}
                 />
               </div>
             )}

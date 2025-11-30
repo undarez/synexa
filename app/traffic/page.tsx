@@ -109,19 +109,9 @@ export default function TrafficPage() {
         setUserLocation(data.userLocation);
       }
 
-      // Si on a des liens Waze, ouvrir automatiquement Waze
-      if (data.wazeLinks?.route) {
-        // Ouvrir Waze directement pour la navigation
-        console.log("[Traffic] Ouverture de Waze:", data.wazeLinks.route);
-        setTimeout(() => {
-          const wazeWindow = window.open(data.wazeLinks.route, "_blank");
-          if (!wazeWindow) {
-            setError("Impossible d'ouvrir Waze. Vérifiez que les popups ne sont pas bloquées.");
-          }
-        }, 300);
-      } else {
-        console.warn("[Traffic] Pas de liens Waze dans la réponse:", data);
-      }
+      // Ne plus ouvrir Waze automatiquement - l'utilisateur peut le faire manuellement
+      // Les données de trafic viennent maintenant de TomTom en priorité
+      console.log("[Traffic] Données de trafic récupérées, source:", data.source);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inconnue");
     } finally {
@@ -202,7 +192,7 @@ export default function TrafficPage() {
             Informations Trafic
           </h1>
           <p className="mt-2 text-[hsl(var(--muted-foreground))]">
-            Consultez le trafic en temps réel basé sur votre position actuelle avec Waze
+            Consultez le trafic en temps réel basé sur votre position actuelle avec TomTom
           </p>
         </div>
 
@@ -212,7 +202,7 @@ export default function TrafficPage() {
             <CardHeader>
               <CardTitle>Configuration</CardTitle>
               <CardDescription>
-                Obtenez votre position et ouvrez Waze pour la navigation
+                Obtenez votre position pour voir les données de trafic en temps réel
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -292,7 +282,7 @@ export default function TrafficPage() {
                         {trafficData.origin} → {trafficData.destination}
                         {trafficData.source && (
                           <span className="ml-2 text-xs">
-                            ({trafficData.source === "google" ? "Google Maps" : trafficData.source === "waze" ? "Waze" : "Simulation"})
+                            ({trafficData.source === "tomtom" ? "TomTom" : trafficData.source === "google" ? "Google Maps" : trafficData.source === "waze" ? "Waze" : "Simulation"})
                           </span>
                         )}
                       </CardDescription>
@@ -397,7 +387,12 @@ export default function TrafficPage() {
                         </p>
                         {trafficData.source === "simulation" && (
                           <p className="mt-2 text-xs text-blue-600 dark:text-blue-500">
-                            💡 <strong>Astuce :</strong> Configurez GOOGLE_MAPS_API_KEY pour des données de trafic précises directement dans Synexa, ou utilisez Waze pour la navigation.
+                            💡 <strong>Astuce :</strong> Configurez TOMTOM_API_KEY dans votre .env pour des données de trafic précises en temps réel (2500 requêtes/jour gratuites).
+                          </p>
+                        )}
+                        {trafficData.source === "tomtom" && (
+                          <p className="mt-2 text-xs text-green-600 dark:text-green-500">
+                            ✅ <strong>Données TomTom :</strong> Informations de trafic en temps réel via l'API TomTom.
                           </p>
                         )}
                       </div>

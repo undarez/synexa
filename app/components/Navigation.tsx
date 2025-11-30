@@ -34,6 +34,7 @@ import {
   Cloud,
   Activity,
   Zap,
+  Wallet,
 } from "lucide-react";
 
 export function Navigation() {
@@ -141,13 +142,26 @@ export function Navigation() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Link
-                href="/health"
-                className="flex items-center gap-1 text-sm font-medium text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--primary))]"
-              >
-                <Activity className="h-4 w-4" />
-                Santé
-              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger className="flex items-center gap-1 text-sm font-medium text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--primary))]">
+                  Bien-être
+                  <ChevronDown className="h-4 w-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem asChild>
+                    <Link href="/health" className="flex items-center gap-2">
+                      <Activity className="h-4 w-4" />
+                      Santé
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/finance" className="flex items-center gap-2">
+                      <Wallet className="h-4 w-4" />
+                      Finance
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </nav>
           </div>
           <div className="flex items-center gap-4">
@@ -333,14 +347,27 @@ export function Navigation() {
                 Météo
               </Link>
             </div>
-            <Link
-              href="/health"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
-            >
-              <Activity className="h-5 w-5" />
-              Santé
-            </Link>
+            <div className="space-y-1">
+              <p className="px-3 text-xs font-semibold uppercase text-[hsl(var(--muted-foreground))]">
+                Bien-être
+              </p>
+              <Link
+                href="/health"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
+              >
+                <Activity className="h-5 w-5" />
+                Santé
+              </Link>
+              <Link
+                href="/finance"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
+              >
+                <Wallet className="h-5 w-5" />
+                Finance
+              </Link>
+            </div>
           </nav>
 
           {session?.user && (

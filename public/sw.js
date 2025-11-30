@@ -31,28 +31,59 @@ self.addEventListener("activate", (event) => {
 
 // Cache strategy: Network first, fallback to cache
 self.addEventListener("fetch", (event) => {
-  // Ne pas mettre en cache les requêtes API
-  if (event.request.url.includes("/api/")) {
+  const { request } = event;
+  
+  // Ignorer complètement les requêtes non-GET
+  if (request.method !== "GET") {
     return;
   }
 
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Mettre en cache les réponses réussies
-        if (response.status === 200) {
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return response;
-      })
-      .catch(() => {
-        // Fallback vers le cache si le réseau échoue
-        return caches.match(event.request);
-      })
-  );
+  try {
+    const url = new URL(request.url);
+
+    // Ne pas mettre en cache les requêtes API
+    if (url.pathname.startsWith("/api/")) {
+      return;
+    }
+
+    // Ne pas mettre en cache les requêtes avec des schémas non supportés
+    // (chrome-extension:, data:, blob:, etc.)
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return;
+    }
+
+    // Ne mettre en cache que les requêtes de la même origine
+    if (url.origin !== self.location.origin) {
+      return;
+    }
+
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          // Mettre en cache uniquement les réponses GET réussies avec un type "basic"
+          if (response.status === 200 && response.type === "basic") {
+            try {
+              const responseToCache = response.clone();
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(request, responseToCache).catch(() => {
+                  // Ignorer silencieusement les erreurs de cache
+                });
+              });
+            } catch (err) {
+              // Ignorer silencieusement les erreurs de clonage
+            }
+          }
+          return response;
+        })
+        .catch(() => {
+          // Fallback vers le cache si le réseau échoue
+          return caches.match(request);
+        })
+    );
+  } catch (err) {
+    // Si l'URL ne peut pas être parsée, ignorer la requête
+    return;
+  }
 });
 
 self.addEventListener("push", (event) => {
