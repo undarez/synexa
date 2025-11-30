@@ -1,0 +1,13 @@
+{
+  "prisma.validate": false,
+  "prisma.schema.validate": false,
+  "files.associations": {
+    "*.prisma": "prisma"
+  },
+  "[prisma]": {
+    "editor.defaultFormatter": "Prisma.prisma"
+  },
+  "prisma.prismaLanguageServer.enable": false,
+  "prisma.prismaLanguageServer.version": "6.19.0"
+}
+

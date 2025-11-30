@@ -1,0 +1,14 @@
+{
+  "overrides": [
+    {
+      "files": ["*.prisma"],
+      "rules": {}
+    }
+  ]
+}
+
+
+
+
+
+

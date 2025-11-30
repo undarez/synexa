@@ -1,0 +1,353 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { redirect } from "next/navigation";
+import { Navigation } from "@/app/components/Navigation";
+import { Footer } from "@/app/components/Footer";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
+import { Button } from "@/app/components/ui/button";
+import { Loader2, Cloud, Droplets, Wind, Thermometer, Sun, CloudRain, CloudSnow, MapPin, RefreshCw } from "lucide-react";
+import dynamic from "next/dynamic";
+
+// Charger WeatherMap uniquement côté client
+const WeatherMap = dynamic(() => import("@/app/components/WeatherMap").then(mod => ({ default: mod.WeatherMap })), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center py-12">
+      <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+    </div>
+  ),
+});
+
+interface WeatherData {
+  current: {
+    temperature: number;
+    humidity: number;
+    windSpeed: number;
+    description: string;
+    icon?: string;
+  };
+  forecast: Array<{
+    date: string;
+    temperature: {
+      min: number;
+      max: number;
+    };
+    description: string;
+    icon?: string;
+  }>;
+  location?: {
+    name?: string;
+    lat: number;
+    lon: number;
+  };
+}
+
+export default function WeatherPage() {
+  const { data: session, status } = useSession();
+  const [loading, setLoading] = useState(true);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      redirect("/?error=auth_required&redirect=/weather");
+    }
+  }, [status]);
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      fetchUserLocation();
+    }
+  }, [status]);
+
+  useEffect(() => {
+    if (userLocation) {
+      fetchWeather();
+      // Actualiser toutes les 5 minutes
+      const interval = setInterval(fetchWeather, 5 * 60 * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [userLocation]);
+
+  const fetchUserLocation = async () => {
+    try {
+      // Essayer de récupérer la position depuis le profil
+      const response = await fetch("/api/profile");
+      if (response.ok) {
+        const data = await response.json();
+        if (data.profile?.workLat && data.profile?.workLng) {
+          setUserLocation({
+            lat: data.profile.workLat,
+            lng: data.profile.workLng,
+          });
+          return;
+        }
+      }
+
+      // Sinon, utiliser la géolocalisation du navigateur
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setUserLocation({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            });
+          },
+          (error) => {
+            console.error("Erreur géolocalisation:", error);
+            setError("Impossible d'obtenir votre position. Veuillez configurer votre adresse dans le profil.");
+            setLoading(false);
+          }
+        );
+      } else {
+        setError("La géolocalisation n'est pas supportée par votre navigateur.");
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error("Erreur récupération position:", err);
+      setError("Erreur lors de la récupération de votre position.");
+      setLoading(false);
+    }
+  };
+
+  const fetchWeather = async () => {
+    if (!userLocation) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch(
+        `/api/weather?lat=${userLocation.lat}&lon=${userLocation.lng}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de la récupération de la météo");
+      }
+
+      const data = await response.json();
+      // Adapter les données au format attendu
+      const weatherData: WeatherData = {
+        current: data.weather.current,
+        forecast: data.weather.forecast.map((f: any) => ({
+          date: f.date,
+          temperature: typeof f.temperature === 'object' ? f.temperature : { min: f.temperature - 2, max: f.temperature + 2 },
+          description: f.description,
+          icon: f.icon,
+        })),
+        location: {
+          name: "Votre position",
+          lat: userLocation.lat,
+          lon: userLocation.lng,
+        },
+      };
+      setWeather(weatherData);
+      setLastUpdate(new Date());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur inconnue");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getWeatherIcon = (description: string, temp: number) => {
+    const desc = description.toLowerCase();
+    if (desc.includes("pluie") || desc.includes("rain")) return CloudRain;
+    if (desc.includes("neige") || desc.includes("snow")) return CloudSnow;
+    if (desc.includes("nuage") || desc.includes("cloud")) return Cloud;
+    if (temp >= 25) return Sun;
+    return Cloud;
+  };
+
+  const getWeatherColor = (temp: number) => {
+    if (temp >= 30) return "text-red-500";
+    if (temp >= 25) return "text-orange-500";
+    if (temp >= 15) return "text-yellow-500";
+    if (temp >= 5) return "text-blue-500";
+    return "text-cyan-500";
+  };
+
+  if (status === "loading" || loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+      </div>
+    );
+  }
+
+  if (status === "unauthenticated") {
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen bg-[hsl(var(--background))]">
+      <Navigation />
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-[hsl(var(--foreground))]">
+              Météo en temps réel
+            </h1>
+            <p className="mt-2 text-[hsl(var(--muted-foreground))]">
+              Consultez les conditions météorologiques actuelles et les prévisions
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={fetchWeather}
+            disabled={loading || !userLocation}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Actualiser
+          </Button>
+        </div>
+
+        {error && (
+          <Card className="mb-6 border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/20">
+            <CardContent className="pt-6">
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {weather && (
+          <>
+            {/* Carte météo */}
+            {userLocation && (
+              <div className="mb-6">
+                <WeatherMap
+                  latitude={userLocation.lat}
+                  longitude={userLocation.lng}
+                  weather={weather as any}
+                />
+              </div>
+            )}
+
+            {/* Conditions actuelles */}
+            <div className="mb-6 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+              <Card className="bg-gradient-to-br from-blue-500/10 to-purple-500/10">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Température</CardTitle>
+                  <Thermometer className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">
+                    <span className={getWeatherColor(weather.current.temperature)}>
+                      {Math.round(weather.current.temperature)}°C
+                    </span>
+                  </div>
+                  <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                    {weather.current.description}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Humidité</CardTitle>
+                  <Droplets className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-[hsl(var(--foreground))]">
+                    {weather.current.humidity}%
+                  </div>
+                  <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                    Taux d'humidité
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-gray-500/10 to-slate-500/10">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Vent</CardTitle>
+                  <Wind className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-[hsl(var(--foreground))]">
+                    {Math.round(weather.current.windSpeed)} km/h
+                  </div>
+                  <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                    Vitesse du vent
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-purple-500/10 to-pink-500/10">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Localisation</CardTitle>
+                  <MapPin className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-lg font-semibold text-[hsl(var(--foreground))]">
+                    {weather.location?.name || "Votre position"}
+                  </div>
+                  <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                    {weather.location?.lat.toFixed(4) || userLocation?.lat.toFixed(4)}, {weather.location?.lon.toFixed(4) || userLocation?.lng.toFixed(4)}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Prévisions */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Prévisions sur 5 jours</CardTitle>
+                <CardDescription>
+                  {lastUpdate && `Dernière mise à jour : ${lastUpdate.toLocaleTimeString("fr-FR")}`}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-5">
+                  {weather.forecast.map((day, index) => {
+                    const Icon = getWeatherIcon(day.description, day.temperature);
+                    const date = new Date(day.date);
+                    const isToday = index === 0;
+
+                    return (
+                      <div
+                        key={index}
+                        className={`rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 transition-all hover:shadow-lg ${
+                          isToday ? "ring-2 ring-[hsl(var(--primary))]" : ""
+                        }`}
+                      >
+                        <div className="text-center">
+                          <p className="text-sm font-semibold text-[hsl(var(--foreground))] mb-2">
+                            {isToday
+                              ? "Aujourd'hui"
+                              : date.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" })}
+                          </p>
+                          <div className="mb-3 flex justify-center">
+                            <Icon className={`h-12 w-12 ${getWeatherColor(day.temperature)}`} />
+                          </div>
+                          <p className="text-2xl font-bold text-[hsl(var(--foreground))] mb-1">
+                            <span className={getWeatherColor(day.temperature.max || day.temperature)}>
+                              {Math.round(day.temperature.max || day.temperature)}°
+                            </span>
+                            {day.temperature.min && (
+                              <span className={`text-sm ml-1 ${getWeatherColor(day.temperature.min)}`}>
+                                / {Math.round(day.temperature.min)}°
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                            {day.description}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </main>
+      <Footer />
+    </div>
+  );
+}
+

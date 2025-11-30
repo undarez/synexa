@@ -1,0 +1,394 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String             @id @default(cuid())
+  name                String?
+  email               String?            @unique
+  password            String?
+  image               String?
+  emailVerified       DateTime?
+  userCode            String?            @unique
+  pseudo              String?
+  firstName           String?
+  lastName            String?
+  homeAddress         String?
+  workAddress         String?
+  workLat             Float?
+  workLng             Float?
+  wifiEnabled         Boolean            @default(false)
+  wifiSSID            String?
+  bluetoothEnabled    Boolean            @default(false)
+  bluetoothDeviceName String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  accounts            Account[]
+  calendarEvents      CalendarEvent[]
+  devices             Device[]
+  messages            Message[]
+  preferences         Preference[]
+  reminders           Reminder[]
+  routines            Routine[]
+  sessions            Session[]
+  tasks               Task[]
+  pushSubscriptions   PushSubscription[]
+  calendarChannels    CalendarChannel[]
+  learning            UserLearning[]
+  activities          UserActivity[]
+  healthMetrics       HealthMetric[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum TaskPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum TaskContext {
+  WORK
+  PERSONAL
+  SHOPPING
+  HEALTH
+  FINANCE
+  HOME
+  SOCIAL
+  LEARNING
+  OTHER
+}
+
+enum EnergyLevel {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+model Task {
+  id               String       @id @default(cuid())
+  userId           String
+  title            String
+  description      String?
+  priority         TaskPriority @default(MEDIUM)
+  context          TaskContext  @default(PERSONAL)
+  estimatedDuration Int?        // en minutes
+  energyLevel      EnergyLevel? // Niveau d'énergie requis pour la tâche
+  completed        Boolean      @default(false)
+  completedAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  due              DateTime?
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, completed])
+  @@index([userId, priority])
+  @@index([userId, context])
+  @@index([userId, due])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  userId    String
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CalendarEvent {
+  id             String         @id @default(cuid())
+  userId         String
+  title          String
+  description    String?
+  location       String?
+  start          DateTime
+  end            DateTime
+  allDay         Boolean        @default(false)
+  source         CalendarSource @default(LOCAL)
+  externalId     String?
+  calendarId     String?
+  reminders      Json?
+  metadata       Json?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reminderEvents Reminder[]
+
+  @@index([userId, start])
+  @@index([externalId])
+}
+
+model CalendarChannel {
+  id            String   @id @default(cuid())
+  userId        String
+  channelId     String   @unique // ID du channel Google
+  resourceId    String   // Resource ID retourné par Google
+  calendarId    String   @default("primary")
+  expiration    DateTime // Date d'expiration du channel (max 7 jours)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiration])
+}
+
+model Routine {
+  id          String             @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  active      Boolean            @default(true)
+  triggerType RoutineTriggerType @default(MANUAL)
+  triggerData Json?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs        RoutineLog[]
+  steps       RoutineStep[]
+}
+
+model Device {
+  id           String        @id @default(cuid())
+  userId       String
+  name         String
+  room         String?
+  provider     String
+  externalId   String
+  type         DeviceType    @default(OTHER)
+  capabilities Json?
+  metadata     Json?
+  lastSeenAt   DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actions      RoutineStep[]
+
+  @@unique([provider, externalId])
+}
+
+model RoutineStep {
+  id           String            @id @default(cuid())
+  routineId    String
+  order        Int
+  actionType   RoutineActionType
+  payload      Json?
+  deviceId     String?
+  delaySeconds Int?
+  device       Device?           @relation(fields: [deviceId], references: [id])
+  routine      Routine           @relation(fields: [routineId], references: [id], onDelete: Cascade)
+
+  @@index([routineId, order])
+}
+
+model RoutineLog {
+  id         String   @id @default(cuid())
+  routineId  String
+  executedAt DateTime @default(now())
+  status     String
+  details    Json?
+  routine    Routine  @relation(fields: [routineId], references: [id], onDelete: Cascade)
+}
+
+model Preference {
+  id        String   @id @default(cuid())
+  userId    String
+  key       String
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+}
+
+model UserLearning {
+  id              String   @id @default(cuid())
+  userId          String
+  category        String   // "task", "event", "routine", "voice_command", "preference"
+  pattern         String   // Pattern détecté (ex: "morning_routine", "work_tasks", "weekend_events")
+  frequency       Int      @default(1) // Nombre de fois observé
+  lastObserved    DateTime @default(now())
+  metadata        Json?    // Données supplémentaires sur le pattern
+  confidence      Float    @default(0.5) // Confiance dans le pattern (0-1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category, pattern])
+  @@index([userId, category])
+  @@index([userId, lastObserved])
+}
+
+model UserActivity {
+  id          String   @id @default(cuid())
+  userId      String
+  activityType String // "task_created", "task_completed", "event_created", "routine_executed", "voice_command", etc.
+  entityType   String? // "Task", "Event", "Routine", etc.
+  entityId     String?
+  metadata     Json?   // Données contextuelles (heure, jour, contexte, etc.)
+  createdAt    DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, activityType, createdAt])
+  @@index([userId, createdAt])
+}
+
+model Reminder {
+  id              String         @id @default(cuid())
+  userId          String
+  calendarEventId String?
+  title           String
+  message         String?
+  reminderType    ReminderType
+  status          ReminderStatus @default(PENDING)
+  scheduledFor    DateTime
+  sentAt          DateTime?
+  includeTraffic  Boolean        @default(false)
+  includeWeather  Boolean        @default(false)
+  trafficInfo     Json?
+  weatherInfo     Json?
+  metadata        Json?
+  // Rappels récurrents
+  isRecurring     Boolean        @default(false)
+  recurrenceRule  String?        // Format: "DAILY", "WEEKLY", "MONTHLY", "YEARLY" ou cron expression
+  recurrenceEnd   DateTime?      // Date de fin de récurrence
+  parentReminderId String?       // ID du rappel parent (pour les récurrences)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  calendarEvent   CalendarEvent? @relation(fields: [calendarEventId], references: [id], onDelete: Cascade)
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, scheduledFor])
+  @@index([status, scheduledFor])
+  @@index([calendarEventId])
+  @@index([parentReminderId])
+}
+
+enum CalendarSource {
+  GOOGLE
+  OUTLOOK
+  ICLOUD
+  LOCAL
+  OTHER
+}
+
+enum RoutineTriggerType {
+  VOICE
+  SCHEDULE
+  LOCATION
+  MANUAL
+  SENSOR
+}
+
+enum DeviceType {
+  LIGHT
+  THERMOSTAT
+  MEDIA
+  OUTLET
+  SENSOR
+  OTHER
+}
+
+enum RoutineActionType {
+  DEVICE_COMMAND
+  NOTIFICATION
+  TASK_CREATE
+  MEDIA_PLAY
+  CUSTOM
+}
+
+enum ReminderType {
+  PUSH
+  EMAIL
+  SMS
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum HealthMetricType {
+  SLEEP
+  ACTIVITY
+  HEART_RATE
+  WEIGHT
+  STEPS
+  CALORIES
+  HYDRATION
+  MOOD
+  STRESS
+  BLOOD_PRESSURE
+  OTHER
+}
+
+model HealthMetric {
+  id          String           @id @default(cuid())
+  userId      String
+  type        HealthMetricType
+  value       Float
+  unit        String?          // "hours", "steps", "bpm", "kg", "ml", etc.
+  source      String?          // "manual", "apple_health", "fitbit", "withings", etc.
+  recordedAt  DateTime         @default(now())
+  metadata    Json?            // Données supplémentaires (durée, qualité, etc.)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type, recordedAt])
+  @@index([userId, recordedAt])
+}

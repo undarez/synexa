@@ -1,0 +1,218 @@
+@import "tailwindcss";
+
+:root {
+  /* Mode clair - Couleurs chaleureuses et accueillantes */
+  /* Background - Blanc cassé très doux, inspire confiance et sérénité */
+  --background: 0 0% 98.5%;
+  --foreground: 240 10% 3.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 3.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 10% 3.9%;
+  
+  /* Primary - Indigo/Violet confiance et professionnel */
+  --primary: 262 83% 58%;
+  --primary-foreground: 0 0% 100%;
+  
+  /* Secondary - Gris doux et apaisant */
+  --secondary: 240 4.8% 97%;
+  --secondary-foreground: 240 5.9% 10%;
+  
+  /* Muted - Gris très doux, confortable pour les yeux */
+  --muted: 240 4.8% 97%;
+  --muted-foreground: 240 3.8% 46.1%;
+  
+  /* Accent - Orange/Amber chaleureux et énergique */
+  --accent: 38 92% 50%;
+  --accent-foreground: 0 0% 100%;
+  
+  /* Success - Vert émeraude confiant */
+  --success: 142 71% 45%;
+  --success-foreground: 0 0% 100%;
+  
+  /* Destructive - Rouge doux mais clair */
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 100%;
+  
+  /* Border - Gris très léger, discret */
+  --border: 240 5.9% 92%;
+  --input: 240 5.9% 92%;
+  --ring: 262 83% 58%;
+  --radius: 0.75rem;
+  
+  /* Couleurs supplémentaires pour l'UI */
+  --gradient-start: 262 83% 58%;
+  --gradient-end: 280 70% 65%;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.08);
+}
+
+.dark {
+  /* Mode sombre - Couleurs profondes et apaisantes */
+  /* Background - Gris doux et profond, confortable pour les yeux */
+  --background: 240 10% 5%;
+  --foreground: 0 0% 98%;
+  --card: 240 10% 7%;
+  --card-foreground: 0 0% 98%;
+  --popover: 240 10% 7%;
+  --popover-foreground: 0 0% 98%;
+  
+  /* Primary - Indigo plus clair pour le dark, reste visible et confiant */
+  --primary: 262 80% 65%;
+  --primary-foreground: 240 10% 5%;
+  
+  /* Secondary - Gris moyen, apaisant */
+  --secondary: 240 3.7% 14%;
+  --secondary-foreground: 0 0% 98%;
+  
+  /* Muted - Gris foncé mais pas trop, confortable */
+  --muted: 240 3.7% 14%;
+  --muted-foreground: 240 5% 64.9%;
+  
+  /* Accent - Orange plus doux en dark, reste chaleureux */
+  --accent: 38 85% 55%;
+  --accent-foreground: 240 10% 5%;
+  
+  /* Success - Vert plus doux */
+  --success: 142 65% 50%;
+  --success-foreground: 240 10% 5%;
+  
+  /* Destructive - Rouge plus doux */
+  --destructive: 0 62.8% 50%;
+  --destructive-foreground: 0 0% 100%;
+  
+  /* Border - Gris foncé mais visible */
+  --border: 240 3.7% 20%;
+  --input: 240 3.7% 20%;
+  --ring: 262 80% 65%;
+  
+  /* Gradients et ombres pour dark */
+  --gradient-start: 262 80% 65%;
+  --gradient-end: 280 65% 70%;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.6), 0 4px 6px -4px rgb(0 0 0 / 0.5);
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Amélioration des scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Animations douces */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Gradients pour les éléments spéciaux */
+.gradient-primary {
+  background: linear-gradient(135deg, hsl(var(--gradient-start)), hsl(var(--gradient-end)));
+}
+
+.gradient-accent {
+  background: linear-gradient(135deg, hsl(var(--accent)), hsl(var(--accent) / 0.8));
+}
+
+/* Ombres douces */
+.shadow-soft {
+  box-shadow: var(--shadow-md);
+}
+
+.shadow-soft-lg {
+  box-shadow: var(--shadow-lg);
+}
+
+/* Animations pour le Lower Third */
+@keyframes gradientShift {
+  0% {
+    background-position: 50% 50%;
+  }
+  25% {
+    background-position: 60% 40%;
+  }
+  50% {
+    background-position: 50% 30%;
+  }
+  75% {
+    background-position: 40% 50%;
+  }
+  100% {
+    background-position: 50% 50%;
+  }
+}
+
+@keyframes fadeInOut {
+  0% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0.8;
+  }
+}
+
+.lower-third-gradient {
+  animation: gradientShift 12s ease-in-out infinite;
+}
+
+.lower-third-fade {
+  animation: fadeInOut 4s ease-in-out;
+}
+
+/* Transition douce pour le lower third */
+@keyframes slideUpFade {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDownFade {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
