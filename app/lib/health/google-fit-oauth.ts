@@ -101,3 +101,4 @@ export async function refreshGoogleFitToken(
   return await response.json();
 }
 
+

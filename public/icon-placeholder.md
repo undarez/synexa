@@ -23,3 +23,4 @@ npx tsx scripts/generate-pwa-icons.ts
 Pour l'instant, vous pouvez utiliser n'importe quelle image PNG de 192x192 et 512x512.
 
 
+

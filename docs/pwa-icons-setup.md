@@ -49,3 +49,4 @@ Après avoir ajouté les icônes, redémarrez le serveur et vérifiez :
 Les fichiers SVG temporaires fonctionnent mais les PNG sont préférés pour une meilleure compatibilité PWA sur tous les navigateurs.
 
 
+

@@ -117,3 +117,4 @@ Le chat avec Synexa inclut :
 
 Toutes les fonctionnalités que nous avons créées sont disponibles dans le chat !
 
+

@@ -161,3 +161,4 @@ Recherche vocale complète avec affichage des résultats.
 **Synexa est maintenant une véritable IA capable de rechercher et afficher des actualités sur n'importe quel sujet !** 🤖✨
 
 
+

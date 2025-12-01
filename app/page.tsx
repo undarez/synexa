@@ -93,7 +93,7 @@ export default async function HomePage({
   ];
 
   return (
-    <div className="min-h-screen bg-[hsl(var(--background))]">
+    <div className="min-h-screen bg-[hsl(var(--background))]" suppressHydrationWarning>
       {/* Message d'erreur d'authentification */}
       {showAuthError && (
         <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">

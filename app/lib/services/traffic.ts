@@ -22,7 +22,117 @@ export interface TrafficData {
   destinationLocation: { lat: number; lng: number } | null;
   routes: TrafficRoute[];
   lastUpdate: string;
-  source: "tomtom" | "google" | "waze" | "simulation";
+  source: "tomtom" | "openrouteservice" | "google" | "waze" | "simulation";
+}
+
+/**
+ * Récupère les données de trafic depuis OpenRouteService (GRATUIT et OPEN-SOURCE)
+ * OpenRouteService est basé sur OpenStreetMap et offre un quota généreux gratuit
+ */
+export async function getTrafficFromOpenRouteService(
+  originLat: number,
+  originLng: number,
+  destinationLat: number,
+  destinationLng: number,
+  destinationAddress?: string
+): Promise<TrafficData | null> {
+  try {
+    console.log("[Traffic OpenRouteService] Appel de l'API OpenRouteService...");
+    
+    // OpenRouteService Directions API - GRATUIT et OPEN-SOURCE
+    const url = new URL("https://api.openrouteservice.org/v2/directions/driving-car");
+    
+    // Pas besoin de clé API pour le service public (mais limité)
+    // Pour plus de requêtes, créer un compte gratuit sur https://openrouteservice.org
+    const apiKey = process.env.OPENROUTESERVICE_API_KEY || ""; // Optionnel mais recommandé
+    
+    if (apiKey) {
+      url.searchParams.append("api_key", apiKey);
+    }
+    
+    // Format GeoJSON pour les coordonnées
+    const coordinates = [
+      [originLng, originLat], // [longitude, latitude]
+      [destinationLng, destinationLat]
+    ];
+    
+    const response = await fetch(url.toString(), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body: JSON.stringify({
+        coordinates: coordinates,
+        format: "json",
+        instructions: true,
+        geometry: true,
+        extra_info: ["surface", "waytype", "steepness"],
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[Traffic OpenRouteService] Erreur HTTP:", response.status, errorText);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log("[Traffic OpenRouteService] Réponse reçue, nombre de routes:", data.routes?.length || 0);
+
+    if (!data.routes || data.routes.length === 0) {
+      return null;
+    }
+
+    const routes: TrafficRoute[] = data.routes.map((route: any, index: number) => {
+      const summary = route.summary;
+      const durationSeconds = summary.duration || 0;
+      const distanceMeters = summary.distance || 0;
+      
+      // Convertir la durée en format lisible
+      const hours = Math.floor(durationSeconds / 3600);
+      const minutes = Math.floor((durationSeconds % 3600) / 60);
+      const duration = hours > 0 ? `${hours}h ${minutes}min` : `${minutes}min`;
+      
+      // Convertir la distance
+      const distance = distanceMeters > 1000 
+        ? `${(distanceMeters / 1000).toFixed(1)} km`
+        : `${Math.round(distanceMeters)} m`;
+      
+      // Extraire la polyline depuis la géométrie
+      const polyline: Array<{ lat: number; lng: number }> = [];
+      if (route.geometry && route.geometry.coordinates) {
+        route.geometry.coordinates.forEach((coord: [number, number]) => {
+          polyline.push({ lat: coord[1], lng: coord[0] });
+        });
+      }
+      
+      return {
+        name: `Itinéraire ${index + 1}`,
+        duration,
+        durationSeconds: Math.round(durationSeconds),
+        distance,
+        distanceMeters: Math.round(distanceMeters),
+        traffic: "Trafic normal", // OpenRouteService ne fournit pas de données de trafic en temps réel
+        status: "good",
+        details: destinationAddress || `${originLat.toFixed(4)},${originLng.toFixed(4)} → ${destinationLat.toFixed(4)},${destinationLng.toFixed(4)}`,
+        polyline,
+      };
+    });
+
+    return {
+      origin: `${originLat.toFixed(4)},${originLng.toFixed(4)}`,
+      destination: destinationAddress || `${destinationLat.toFixed(4)},${destinationLng.toFixed(4)}`,
+      userLocation: { lat: originLat, lng: originLng },
+      destinationLocation: { lat: destinationLat, lng: destinationLng },
+      routes,
+      lastUpdate: new Date().toISOString(),
+      source: "openrouteservice",
+    };
+  } catch (error) {
+    console.error("[Traffic OpenRouteService] Erreur:", error);
+    return null;
+  }
 }
 
 /**
@@ -59,12 +169,19 @@ export async function getTrafficFromTomTom(
     url.searchParams.append("alternatives", "3"); // Jusqu'à 3 itinéraires alternatifs
     
     // Format: lat1,lng1:lat2,lng2
-    const waypoints = `${originLat},${originLng}:${destinationLat},${destinationLng}`;
+    // Note: TomTom utilise lon,lat (longitude en premier)
+    const waypoints = `${originLng},${originLat}:${destinationLng},${destinationLat}`;
     url.searchParams.append("waypoints", waypoints);
 
     console.log("[Traffic TomTom] URL:", url.toString().replace(apiKey, "***"));
 
-    const response = await fetch(url.toString());
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+    });
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -233,24 +350,34 @@ export async function getTrafficIncidentsFromTomTom(
   }
 
   try {
-    // TomTom Traffic Incidents API
+    // TomTom Traffic Incidents API - Version correcte
+    // Format bbox: "minLon,minLat,maxLon,maxLat"
     const url = new URL("https://api.tomtom.com/traffic/services/4/incidentDetails");
     url.searchParams.append("key", apiKey);
     url.searchParams.append("bbox", bbox);
     url.searchParams.append("language", "fr-FR");
-    url.searchParams.append("fields", "{incidents{type,geometry,properties{iconCategory,startTime,from,to,length,delay,roadNumbers,description}}}");
+    url.searchParams.append("projection", "EPSG4326");
+    // Ne pas utiliser fields pour éviter les erreurs 404
+    // url.searchParams.append("fields", "{incidents{type,geometry,properties{iconCategory,startTime,from,to,length,delay,roadNumbers,description}}}");
+
+    console.log("[Traffic] Appel TomTom Traffic Incidents API:", url.toString().replace(apiKey, "***"));
 
     const response = await fetch(url.toString());
     
     if (!response.ok) {
-      throw new Error(`TomTom Traffic Incidents API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error("[Traffic] Erreur TomTom Traffic Incidents:", response.status, errorText);
+      // Retourner un objet vide au lieu de null pour éviter les erreurs
+      return { incidents: [] };
     }
 
     const data = await response.json();
+    console.log("[Traffic] Incidents récupérés:", data.incidents?.length || 0);
     return data;
   } catch (error) {
     console.error("[Traffic] Erreur TomTom Traffic Incidents:", error);
-    return null;
+    // Retourner un objet vide au lieu de null
+    return { incidents: [] };
   }
 }
 

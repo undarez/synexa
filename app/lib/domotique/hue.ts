@@ -340,3 +340,4 @@ function kelvinToMired(kelvin: number): number {
   return Math.round(1000000 / kelvin);
 }
 
+

@@ -46,6 +46,7 @@ model User {
   incomes             Income[]
   expenses            Expense[]
   budgets             Budget[]
+  dashboardWidgets    DashboardWidget[]
 }
 
 model Account {
@@ -525,4 +526,23 @@ model Budget {
   @@index([userId, isActive])
   @@index([userId, category])
   @@index([userId, period])
+}
+
+model DashboardWidget {
+  id          String   @id @default(cuid())
+  userId      String
+  widgetType  String   // "events", "tasks", "weather", "traffic", "health", "finance", "routines", "news", "wellness", "recommendations"
+  position    Int      // Position dans la grille (ordre d'affichage)
+  column      Int      @default(1) // Colonne (1, 2, 3)
+  row         Int      @default(1) // Ligne
+  size        String   @default("medium") // "small", "medium", "large"
+  visible     Boolean  @default(true)
+  config      Json?    // Configuration spécifique du widget
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, widgetType])
+  @@index([userId, position])
+  @@index([userId, visible])
 }

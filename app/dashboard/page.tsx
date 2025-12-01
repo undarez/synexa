@@ -13,6 +13,7 @@ import { Footer } from "@/app/components/Footer";
 import { ChatInterface } from "@/app/components/ChatInterface";
 import { PersonalizedRecommendations } from "@/app/components/PersonalizedRecommendations";
 import { WellnessDashboard } from "@/app/components/WellnessDashboard";
+import { DashboardWidgetManager } from "@/app/components/DashboardWidgetManager";
 
 async function getUserDisplayName(userId: string): Promise<string> {
   try {
@@ -111,28 +112,12 @@ export default async function Dashboard() {
           </p>
         </div>
 
-        {/* Brief quotidien amélioré */}
-        <div className="mb-6">
-          <DailyBrief />
-        </div>
-
-        <div className="mb-6 grid gap-6 md:grid-cols-2">
-          <VoiceCommandWrapper />
-          <ChatInterface />
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <EventsList events={brief.agenda || []} />
-          </div>
-          <div className="space-y-6">
-            <WellnessDashboard />
-            <PersonalizedRecommendations />
-            <NetworkDetector />
-            <TasksList tasks={brief.tasks || []} />
-            <RoutinesList routines={brief.activeRoutines || []} />
-          </div>
-        </div>
+        {/* Gestionnaire de widgets personnalisables */}
+        <DashboardWidgetManager
+          events={brief.agenda || []}
+          tasks={brief.tasks || []}
+          routines={brief.activeRoutines || []}
+        />
       </main>
       <Footer />
     </div>

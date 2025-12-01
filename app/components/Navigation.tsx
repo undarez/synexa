@@ -35,6 +35,7 @@ import {
   Activity,
   Zap,
   Wallet,
+  Bot,
 } from "lucide-react";
 
 export function Navigation() {
@@ -101,6 +102,12 @@ export function Navigation() {
                   <ChevronDown className="h-4 w-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
+                  <DropdownMenuItem asChild>
+                    <Link href="/synexa" className="flex items-center gap-2">
+                      <Bot className="h-4 w-4" />
+                      Synexa
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link href="/routines" className="flex items-center gap-2">
                       <Zap className="h-4 w-4" />
@@ -253,6 +260,14 @@ export function Navigation() {
               Accueil
             </Link>
             <Link
+              href="/synexa"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
+            >
+              <Bot className="h-5 w-5" />
+              Synexa
+            </Link>
+            <Link
               href="/about"
               onClick={() => setMobileMenuOpen(false)}
               className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
@@ -301,6 +316,14 @@ export function Navigation() {
               <p className="px-3 text-xs font-semibold uppercase text-[hsl(var(--muted-foreground))]">
                 Domotique
               </p>
+              <Link
+                href="/synexa"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
+              >
+                <Bot className="h-5 w-5" />
+                Synexa
+              </Link>
               <Link
                 href="/routines"
                 onClick={() => setMobileMenuOpen(false)}

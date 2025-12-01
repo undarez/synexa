@@ -117,18 +117,15 @@ export function AnimatedSphere({ className = "", size = 300 }: AnimatedSpherePro
   }, [isMounted, size]);
 
   return (
-    <div className={`relative ${className}`}>
-      {isMounted ? (
-        <>
-          <canvas
-            ref={canvasRef}
-            className="h-full w-full"
-            style={{ imageRendering: "auto" }}
-          />
-          {/* Effet de brillance */}
-          <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-400/20 via-purple-500/20 to-blue-600/20 blur-3xl" />
-        </>
-      ) : (
+    <div className={`relative ${className}`} suppressHydrationWarning>
+      <canvas
+        ref={canvasRef}
+        className="h-full w-full"
+        style={{ imageRendering: "auto", display: isMounted ? "block" : "none" }}
+      />
+      {/* Effet de brillance */}
+      <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-400/20 via-purple-500/20 to-blue-600/20 blur-3xl" />
+      {!isMounted && (
         // Placeholder pendant le montage pour éviter l'erreur d'hydratation
         <div className="h-full w-full flex items-center justify-center">
           <div className="rounded-full bg-gradient-to-br from-blue-400/20 via-purple-500/20 to-blue-600/20 blur-3xl h-full w-full" />

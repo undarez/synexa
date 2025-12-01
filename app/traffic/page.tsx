@@ -1,21 +1,53 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { Navigation } from "@/app/components/Navigation";
-import { Footer } from "@/app/components/Footer";
-import { TrafficMap } from "@/app/components/TrafficMap";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
-import { Loader2, MapPin, Navigation as NavigationIcon, RefreshCw, AlertCircle, CheckCircle2, Clock, Route, ExternalLink } from "lucide-react";
+import { Navigation } from "@/app/components/Navigation";
+import { 
+  MapPin, 
+  Navigation as NavigationIcon, 
+  RefreshCw, 
+  AlertTriangle, 
+  Clock, 
+  Route,
+  Loader2,
+  TrendingUp,
+  Car,
+  AlertCircle
+} from "lucide-react";
+import dynamic from "next/dynamic";
+
+// Charger TrafficMap uniquement côté client
+const TrafficMap = dynamic(() => import("@/app/components/TrafficMap").then(mod => ({ default: mod.TrafficMap })), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center py-12">
+      <Loader2 className="h-8 w-8 animate-spin text-[hsl(var(--muted-foreground))]" />
+    </div>
+  ),
+});
+
+interface TrafficIncident {
+  id: string;
+  type: string;
+  severity: "low" | "medium" | "high";
+  lat: number;
+  lng: number;
+  description: string;
+  delay?: number; // en minutes
+  distance?: number; // en km
+}
 
 interface TrafficRoute {
   name: string;
   duration: string;
   distance: string;
+  durationSeconds: number;
+  distanceMeters: number;
   traffic: string;
   status: "good" | "moderate" | "heavy" | "bad";
   details: string;
@@ -28,49 +60,42 @@ interface TrafficData {
   userLocation: { lat: number; lng: number } | null;
   destinationLocation: { lat: number; lng: number } | null;
   routes: TrafficRoute[];
+  incidents: TrafficIncident[];
   lastUpdate: string;
+  source: string;
 }
 
 export default function TrafficPage() {
   const { data: session, status } = useSession();
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [locationLoading, setLocationLoading] = useState(false);
-  const [trafficData, setTrafficData] = useState<TrafficData | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [destination, setDestination] = useState("");
-  const [customDestination, setCustomDestination] = useState("");
+  const [trafficData, setTrafficData] = useState<TrafficData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/?error=auth_required&redirect=/traffic");
-      return;
-    }
-  }, [status, router]);
-
+  // Obtenir la position actuelle
   const getCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      setError("La géolocalisation n'est pas supportée par votre navigateur");
-      return;
-    }
-
     setLocationLoading(true);
     setError(null);
 
+    if (!navigator.geolocation) {
+      setError("La géolocalisation n'est pas supportée par votre navigateur");
+      setLocationLoading(false);
+      return;
+    }
+
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const location = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        };
-        setUserLocation(location);
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setUserLocation({ lat: latitude, lng: longitude });
         setLocationLoading(false);
-        // Charger automatiquement le trafic et ouvrir Waze
-        await fetchTraffic(location.lat, location.lng);
+        // Charger automatiquement les données de trafic autour de la position
+        fetchTrafficAroundLocation(latitude, longitude);
       },
       (err) => {
-        setError(`Erreur de géolocalisation: ${err.message}`);
+        console.error("Erreur géolocalisation:", err);
+        setError("Impossible d'obtenir votre position. Vérifiez les permissions de géolocalisation.");
         setLocationLoading(false);
       },
       {
@@ -81,21 +106,13 @@ export default function TrafficPage() {
     );
   };
 
-  const fetchTraffic = async (lat?: number, lng?: number) => {
+  // Récupérer les données de trafic autour de la position
+  const fetchTrafficAroundLocation = async (lat: number, lng: number) => {
     setLoading(true);
     setError(null);
 
     try {
-      const params = new URLSearchParams();
-      if (lat && lng) {
-        params.append("lat", lat.toString());
-        params.append("lng", lng.toString());
-      }
-      if (customDestination || destination) {
-        params.append("destination", customDestination || destination);
-      }
-
-      const response = await fetch(`/api/traffic?${params.toString()}`);
+      const response = await fetch(`/api/traffic/around?lat=${lat}&lng=${lng}`);
       
       if (!response.ok) {
         throw new Error("Erreur lors de la récupération des données de trafic");
@@ -103,15 +120,6 @@ export default function TrafficPage() {
 
       const data = await response.json();
       setTrafficData(data);
-      
-      // Mettre à jour la position utilisateur si fournie
-      if (data.userLocation) {
-        setUserLocation(data.userLocation);
-      }
-
-      // Ne plus ouvrir Waze automatiquement - l'utilisateur peut le faire manuellement
-      // Les données de trafic viennent maintenant de TomTom en priorité
-      console.log("[Traffic] Données de trafic récupérées, source:", data.source);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inconnue");
     } finally {
@@ -119,30 +127,74 @@ export default function TrafficPage() {
     }
   };
 
-  const handleSearch = () => {
+  // Rechercher un itinéraire vers une destination
+  const searchRoute = async () => {
     if (!userLocation) {
       setError("Veuillez d'abord obtenir votre position actuelle");
       return;
     }
-    fetchTraffic(userLocation.lat, userLocation.lng);
-  };
 
-  const openWaze = () => {
-    if (!userLocation) {
-      setError("Veuillez d'abord obtenir votre position actuelle");
+    if (!destination.trim()) {
+      setError("Veuillez saisir une destination");
       return;
     }
-    
-    // Si on a déjà des données de trafic avec des liens Waze, les utiliser
-    if (trafficData?.wazeLinks) {
-      window.open(trafficData.wazeLinks.route, "_blank");
-      return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const params = new URLSearchParams({
+        lat: userLocation.lat.toString(),
+        lng: userLocation.lng.toString(),
+        destination: destination.trim(),
+      });
+
+      const response = await fetch(`/api/traffic?${params.toString()}`);
+      
+      if (!response.ok) {
+        throw new Error("Erreur lors de la récupération de l'itinéraire");
+      }
+
+      const data = await response.json();
+      
+      if (data.error) {
+        setError(data.error);
+        setTrafficData(null);
+        return;
+      }
+      
+      setTrafficData(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur inconnue");
+    } finally {
+      setLoading(false);
     }
-    
-    // Sinon, récupérer les données de trafic d'abord (qui ouvrira Waze automatiquement)
-    fetchTraffic(userLocation.lat, userLocation.lng);
   };
 
+  // Actualiser les données
+  const refreshData = () => {
+    if (userLocation) {
+      if (destination.trim()) {
+        searchRoute();
+      } else {
+        fetchTrafficAroundLocation(userLocation.lat, userLocation.lng);
+      }
+    }
+  };
+
+  // Obtenir l'icône de sévérité
+  const getSeverityIcon = (severity: string) => {
+    switch (severity) {
+      case "high":
+        return <AlertTriangle className="h-4 w-4 text-red-500" />;
+      case "medium":
+        return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+      default:
+        return <AlertCircle className="h-4 w-4 text-blue-500" />;
+    }
+  };
+
+  // Obtenir la couleur de statut
   const getStatusColor = (status: string) => {
     switch (status) {
       case "good":
@@ -150,24 +202,11 @@ export default function TrafficPage() {
       case "moderate":
         return "text-yellow-600 dark:text-yellow-400";
       case "heavy":
+        return "text-orange-600 dark:text-orange-400";
       case "bad":
         return "text-red-600 dark:text-red-400";
       default:
-        return "text-[hsl(var(--muted-foreground))]";
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "good":
-        return <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />;
-      case "moderate":
-        return <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />;
-      case "heavy":
-      case "bad":
-        return <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />;
-      default:
-        return null;
+        return "text-gray-600 dark:text-gray-400";
     }
   };
 
@@ -189,10 +228,10 @@ export default function TrafficPage() {
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-[hsl(var(--foreground))]">
-            Informations Trafic
+            Trafic Routier en Temps Réel
           </h1>
           <p className="mt-2 text-[hsl(var(--muted-foreground))]">
-            Consultez le trafic en temps réel basé sur votre position actuelle avec TomTom
+            Consultez les conditions de trafic, accidents et bouchons autour de vous
           </p>
         </div>
 
@@ -227,23 +266,38 @@ export default function TrafficPage() {
 
                 <div className="flex-1">
                   <Label htmlFor="destination">Destination (optionnel)</Label>
-                  <Input
-                    id="destination"
-                    value={customDestination}
-                    onChange={(e) => setCustomDestination(e.target.value)}
-                    placeholder="Ex: Travail, Domicile, Adresse..."
-                    disabled={loading}
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      id="destination"
+                      value={destination}
+                      onChange={(e) => setDestination(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          searchRoute();
+                        }
+                      }}
+                      placeholder="Ex: Travail, Adresse..."
+                      disabled={loading}
+                      className="flex-1"
+                    />
+                    <Button
+                      onClick={searchRoute}
+                      disabled={!userLocation || !destination.trim() || loading}
+                      variant="outline"
+                    >
+                      <NavigationIcon className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
 
                 <Button
-                  onClick={openWaze}
+                  onClick={refreshData}
                   disabled={!userLocation || loading}
-                  variant="default"
+                  variant="outline"
                   className="flex-1"
                 >
-                  <NavigationIcon className="mr-2 h-4 w-4" />
-                  Ouvrir Waze
+                  <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                  Actualiser
                 </Button>
               </div>
 
@@ -267,160 +321,159 @@ export default function TrafficPage() {
             </CardContent>
           </Card>
 
-          {/* Carte et itinéraires */}
+          {/* Carte */}
           {trafficData && userLocation && (
-            <>
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <Route className="h-5 w-5" />
-                        Carte du trafic
-                      </CardTitle>
-                      <CardDescription>
-                        {trafficData.origin} → {trafficData.destination}
-                        {trafficData.source && (
-                          <span className="ml-2 text-xs">
-                            ({trafficData.source === "tomtom" ? "TomTom" : trafficData.source === "google" ? "Google Maps" : trafficData.source === "waze" ? "Waze" : "Simulation"})
-                          </span>
-                        )}
-                      </CardDescription>
-                    </div>
-                    {trafficData.wazeLinks && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(trafficData.wazeLinks!.route, "_blank")}
-                        className="flex items-center gap-2"
-                      >
-                        <NavigationIcon className="h-4 w-4" />
-                        Waze
-                      </Button>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <TrafficMap
-                    userLocation={userLocation}
-                    routes={trafficData.routes}
-                  />
-                </CardContent>
-              </Card>
+            <TrafficMap
+              userLocation={userLocation}
+              destinationLocation={trafficData.destinationLocation}
+              routes={trafficData.routes || []}
+              incidents={trafficData.incidents || []}
+            />
+          )}
 
-              {/* Liste des itinéraires */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <NavigationIcon className="h-5 w-5" />
-                    Itinéraires disponibles
-                  </CardTitle>
-                  <CardDescription>
-                    {trafficData.routes.length} itinéraire{trafficData.routes.length > 1 ? "s" : ""} disponible{trafficData.routes.length > 1 ? "s" : ""}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {trafficData.routes.map((route, index) => (
-                      <div
-                        key={index}
-                        className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 transition-all hover:shadow-soft hover:border-[hsl(var(--primary))]/20"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-semibold text-[hsl(var(--foreground))]">
-                                {route.name}
-                              </h3>
-                              {getStatusIcon(route.status)}
-                            </div>
-                            <div className="mt-2 flex flex-wrap items-center gap-4 text-sm">
-                              <div className="flex items-center gap-1 text-[hsl(var(--muted-foreground))]">
-                                <Clock className="h-4 w-4" />
-                                <span>{route.duration}</span>
+          {/* Incidents de trafic */}
+          {trafficData && trafficData.incidents && trafficData.incidents.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-red-500" />
+                  Incidents de trafic ({trafficData.incidents.length})
+                </CardTitle>
+                <CardDescription>
+                  Incidents détectés autour de votre position
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {trafficData.incidents.map((incident) => (
+                    <div
+                      key={incident.id}
+                      className={`rounded-lg border p-4 ${
+                        incident.severity === "high"
+                          ? "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/20"
+                          : incident.severity === "medium"
+                          ? "border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950/20"
+                          : "border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/20"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {getSeverityIcon(incident.severity)}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-[hsl(var(--foreground))]">
+                              {incident.type}
+                            </p>
+                            <span
+                              className={`text-xs font-medium ${
+                                incident.severity === "high"
+                                  ? "text-red-600 dark:text-red-400"
+                                  : incident.severity === "medium"
+                                  ? "text-yellow-600 dark:text-yellow-400"
+                                  : "text-blue-600 dark:text-blue-400"
+                              }`}
+                            >
+                              {incident.severity === "high"
+                                ? "Sévère"
+                                : incident.severity === "medium"
+                                ? "Modéré"
+                                : "Faible"}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+                            {incident.description}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-4 text-xs text-[hsl(var(--muted-foreground))]">
+                            {incident.delay && (
+                              <div className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                <span>Délai: ~{incident.delay} min</span>
                               </div>
-                              <div className="flex items-center gap-1 text-[hsl(var(--muted-foreground))]">
-                                <Route className="h-4 w-4" />
-                                <span>{route.distance}</span>
+                            )}
+                            {incident.distance && (
+                              <div className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                <span>{incident.distance.toFixed(1)} km</span>
                               </div>
-                              <span className={`font-medium ${getStatusColor(route.status)}`}>
-                                {route.traffic}
-                              </span>
-                            </div>
-                            {route.details && (
-                              <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
-                                {route.details}
-                              </p>
                             )}
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-
-                  {/* Liens Waze */}
-                  {trafficData.wazeLinks && (
-                    <div className="mt-6 space-y-3">
-                      <div className="flex flex-wrap gap-3">
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => window.open(trafficData.wazeLinks!.route, "_blank")}
-                          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
-                        >
-                          <NavigationIcon className="h-4 w-4" />
-                          Ouvrir la navigation dans Waze
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(trafficData.wazeLinks!.destination, "_blank")}
-                          className="flex items-center gap-2"
-                        >
-                          <MapPin className="h-4 w-4" />
-                          Voir la destination dans Waze
-                        </Button>
-                      </div>
-                      <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-950/20">
-                        <p className="text-xs text-blue-700 dark:text-blue-400">
-                          <strong>💡 Option Waze (gratuite) :</strong> Cliquez sur les boutons ci-dessus pour ouvrir Waze et obtenir des informations de trafic en temps réel directement depuis l'application.
-                        </p>
-                        {trafficData.source === "simulation" && (
-                          <p className="mt-2 text-xs text-blue-600 dark:text-blue-500">
-                            💡 <strong>Astuce :</strong> Configurez TOMTOM_API_KEY dans votre .env pour des données de trafic précises en temps réel (2500 requêtes/jour gratuites).
-                          </p>
-                        )}
-                        {trafficData.source === "tomtom" && (
-                          <p className="mt-2 text-xs text-green-600 dark:text-green-500">
-                            ✅ <strong>Données TomTom :</strong> Informations de trafic en temps réel via l'API TomTom.
-                          </p>
-                        )}
-                      </div>
                     </div>
-                  )}
-                  
-                  <div className="mt-4 text-xs text-[hsl(var(--muted-foreground))]">
-                    Dernière mise à jour: {new Date(trafficData.lastUpdate).toLocaleString("fr-FR")}
-                  </div>
-                </CardContent>
-              </Card>
-            </>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           )}
 
-          {!trafficData && !loading && (
+          {/* Itinéraires */}
+          {trafficData && trafficData.routes && trafficData.routes.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <NavigationIcon className="h-5 w-5" />
+                  Itinéraires disponibles ({trafficData.routes.length})
+                </CardTitle>
+                <CardDescription>
+                  Itinéraires calculés vers votre destination
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {trafficData.routes.map((route, index) => (
+                    <div
+                      key={index}
+                      className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 transition-all hover:shadow-md"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-[hsl(var(--foreground))]">
+                              {route.name}
+                            </h3>
+                            <span className={`text-xs font-medium ${getStatusColor(route.status)}`}>
+                              {route.traffic}
+                            </span>
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-4 text-sm">
+                            <div className="flex items-center gap-1 text-[hsl(var(--muted-foreground))]">
+                              <Clock className="h-4 w-4" />
+                              <span>{route.duration}</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-[hsl(var(--muted-foreground))]">
+                              <Route className="h-4 w-4" />
+                              <span>{route.distance}</span>
+                            </div>
+                          </div>
+                          {route.details && (
+                            <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
+                              {route.details}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Message si pas de données */}
+          {userLocation && !trafficData && !loading && (
             <Card>
               <CardContent className="py-12 text-center">
-                <MapPin className="mx-auto h-12 w-12 text-[hsl(var(--muted-foreground))]" />
-                <p className="mt-4 text-[hsl(var(--muted-foreground))]">
-                  Cliquez sur "Obtenir ma position" pour commencer
+                <Car className="mx-auto h-12 w-12 text-[hsl(var(--muted-foreground))] mb-4" />
+                <p className="text-sm font-medium text-[hsl(var(--foreground))] mb-2">
+                  Aucune donnée de trafic disponible
+                </p>
+                <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                  Saisissez une destination pour voir les itinéraires
                 </p>
               </CardContent>
             </Card>
           )}
         </div>
       </main>
-      <Footer />
     </div>
   );
 }
-

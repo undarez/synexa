@@ -40,3 +40,4 @@ console.log("\n✅ Fichiers SVG créés (temporaires)");
 console.log("⚠️  Remplacez-les par des PNG pour une meilleure compatibilité PWA");
 
 
+

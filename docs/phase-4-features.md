@@ -225,3 +225,4 @@ Améliorer l'apprentissage et la personnalisation avec une mémoire persistante.
 3. Créer le tableau de bord Bien-être
 4. Ajouter le suivi des factures
 
+
