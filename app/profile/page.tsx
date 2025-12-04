@@ -30,6 +30,8 @@ interface UserProfile {
   wifiSSID: string | null;
   bluetoothEnabled: boolean;
   bluetoothDeviceName: string | null;
+  mobileDataEnabled: boolean;
+  meterSerialNumber: string | null;
 }
 
 export default function ProfilePage() {
@@ -49,6 +51,8 @@ export default function ProfilePage() {
     wifiSSID: "",
     bluetoothEnabled: false,
     bluetoothDeviceName: "",
+    mobileDataEnabled: false,
+    meterSerialNumber: "",
   });
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -79,6 +83,8 @@ export default function ProfilePage() {
         wifiSSID: data.profile.wifiSSID || "",
         bluetoothEnabled: data.profile.bluetoothEnabled || false,
         bluetoothDeviceName: data.profile.bluetoothDeviceName || "",
+        mobileDataEnabled: data.profile.mobileDataEnabled || false,
+        meterSerialNumber: data.profile.meterSerialNumber || "",
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Une erreur est survenue");
@@ -533,10 +539,54 @@ export default function ProfilePage() {
                       />
                     )}
                   </div>
+
+                  <div className="grid gap-2">
+                    <div className="flex items-center gap-2">
+                      <Wifi className="h-5 w-5" />
+                      <Label htmlFor="mobileDataEnabled">Données mobiles</Label>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        id="mobileDataEnabled"
+                        checked={formData.mobileDataEnabled}
+                        onChange={(e) =>
+                          setFormData({ ...formData, mobileDataEnabled: e.target.checked })
+                        }
+                        disabled={saving}
+                        className="h-4 w-4 rounded border-zinc-300"
+                      />
+                      <Label htmlFor="mobileDataEnabled" className="cursor-pointer">
+                        {formData.mobileDataEnabled ? "Activé" : "Désactivé"}
+                      </Label>
+                    </div>
+                  </div>
                 </div>
                 <p className="text-xs text-zinc-500 mt-2">
                   Ces informations permettent à l'application de détecter votre connexion réseau et vos périphériques.
                 </p>
+              </div>
+
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold mb-4">Compteur électrique (Enedis)</h3>
+                <div className="grid gap-2">
+                  <Label htmlFor="meterSerialNumber">
+                    Numéro de série du compteur
+                  </Label>
+                  <Input
+                    id="meterSerialNumber"
+                    value={formData.meterSerialNumber}
+                    onChange={(e) =>
+                      setFormData({ ...formData, meterSerialNumber: e.target.value })
+                    }
+                    placeholder="Ex: 12345678901234"
+                    disabled={saving}
+                  />
+                  <p className="text-xs text-zinc-500">
+                    Ce numéro permet de récupérer automatiquement vos données de consommation depuis l'API Enedis.
+                    Vous le trouvez sur votre facture d'électricité ou directement sur votre compteur.
+                  </p>
+                </div>
               </div>
 
               <div className="space-y-4 border-t border-zinc-200 pt-6 dark:border-zinc-800">

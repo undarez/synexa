@@ -36,6 +36,7 @@ import {
   Zap,
   Wallet,
   Bot,
+  Shield,
 } from "lucide-react";
 
 export function Navigation() {
@@ -109,6 +110,12 @@ export function Navigation() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
+                    <Link href="/smart-home" className="flex items-center gap-2">
+                      <Home className="h-4 w-4" />
+                      Smart Home
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
                     <Link href="/routines" className="flex items-center gap-2">
                       <Zap className="h-4 w-4" />
                       Automatisations
@@ -118,6 +125,12 @@ export function Navigation() {
                     <Link href="/devices" className="flex items-center gap-2">
                       <Wifi className="h-4 w-4" />
                       Devices
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/security" className="flex items-center gap-2">
+                      <Shield className="h-4 w-4" />
+                      Sécurité
                     </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -145,6 +158,12 @@ export function Navigation() {
                     <Link href="/weather" className="flex items-center gap-2">
                       <Cloud className="h-4 w-4" />
                       Météo
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/energy" className="flex items-center gap-2">
+                      <Zap className="h-4 w-4" />
+                      Consommation électrique
                     </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -325,6 +344,14 @@ export function Navigation() {
                 Synexa
               </Link>
               <Link
+                href="/smart-home"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
+              >
+                <Home className="h-5 w-5" />
+                Smart Home
+              </Link>
+              <Link
                 href="/routines"
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
@@ -339,6 +366,14 @@ export function Navigation() {
               >
                 <Wifi className="h-5 w-5" />
                 Devices
+              </Link>
+              <Link
+                href="/security"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
+              >
+                <Shield className="h-5 w-5" />
+                Sécurité
               </Link>
             </div>
             <Link
@@ -368,6 +403,14 @@ export function Navigation() {
               >
                 <Cloud className="h-5 w-5" />
                 Météo
+              </Link>
+              <Link
+                href="/energy"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
+              >
+                <Zap className="h-5 w-5" />
+                Consommation électrique
               </Link>
             </div>
             <div className="space-y-1">

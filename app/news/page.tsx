@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
-import { Search, Loader2, Newspaper, TrendingUp } from "lucide-react";
+import { Search, Loader2, Newspaper, TrendingUp, Settings, Sparkles } from "lucide-react";
 import { Navigation } from "@/app/components/Navigation";
 import { NewsResults } from "@/app/components/NewsResults";
 import { Button } from "@/app/components/ui/button";
@@ -28,12 +28,36 @@ export default function NewsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastSearch, setLastSearch] = useState<string>("");
+  const [showPreferences, setShowPreferences] = useState(false);
+  const [preferences, setPreferences] = useState<any>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
       redirect("/?error=auth_required&redirect=/news");
     }
   }, [status]);
+
+  // Charger automatiquement les actualités générales au montage
+  useEffect(() => {
+    if (status === "authenticated" && articles.length === 0 && !loading && !lastSearch) {
+      setCategory("general");
+      setTimeout(() => {
+        searchNews();
+      }, 100);
+    }
+  }, [status]);
+
+  const fetchPreferences = async () => {
+    try {
+      const response = await fetch("/api/news/preferences");
+      if (response.ok) {
+        const data = await response.json();
+        setPreferences(data.preferences);
+      }
+    } catch (err) {
+      console.error("Erreur récupération préférences:", err);
+    }
+  };
 
   const searchNews = async () => {
     if (!searchQuery.trim() && category === "all") {
@@ -96,14 +120,80 @@ export default function NewsPage() {
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
       <Navigation />
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50">
-            Actualités
-          </h1>
-          <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-            Recherchez et consultez les dernières actualités sur n'importe quel sujet
-          </p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50">
+              Actualités
+            </h1>
+            <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+              Recherchez et consultez les dernières actualités sur n'importe quel sujet
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setShowPreferences(!showPreferences);
+              if (!showPreferences && !preferences) {
+                fetchPreferences();
+              }
+            }}
+          >
+            <Settings className="mr-2 h-4 w-4" />
+            Préférences
+          </Button>
         </div>
+
+        {/* Préférences d'actualités */}
+        {showPreferences && (
+          <Card className="mb-6 border-[hsl(var(--primary))]/30 bg-gradient-to-br from-[hsl(var(--card))] to-[hsl(var(--primary))]/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-[hsl(var(--primary))]" />
+                Préférences d'actualités
+              </CardTitle>
+              <CardDescription>
+                Personnalisez vos actualités selon vos préférences
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {preferences ? (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium mb-2">Catégories préférées :</p>
+                    <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                      {preferences.preferredCategories?.length > 0
+                        ? preferences.preferredCategories.join(", ")
+                        : "Aucune (inférées automatiquement)"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium mb-2">Sources préférées :</p>
+                    <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                      {preferences.preferredSources?.length > 0
+                        ? preferences.preferredSources.join(", ")
+                        : "Toutes les sources"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium mb-2">Mots-clés exclus :</p>
+                    <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                      {preferences.excludedKeywords?.length > 0
+                        ? preferences.excludedKeywords.join(", ")
+                        : "Aucun"}
+                    </p>
+                  </div>
+                  <p className="text-xs text-[hsl(var(--muted-foreground))] italic">
+                    💡 Vos préférences sont inférées automatiquement selon vos consultations d'articles.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-4 w-4 animate-spin text-[hsl(var(--muted-foreground))]" />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Barre de recherche */}
         <Card className="mb-6">
@@ -242,6 +332,8 @@ export default function NewsPage() {
     </div>
   );
 }
+
+
 
 
 

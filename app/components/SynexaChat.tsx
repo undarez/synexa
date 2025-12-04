@@ -265,3 +265,7 @@ export default function SynexaChat({ className = "" }: SynexaChatProps) {
   );
 }
 
+
+
+
+

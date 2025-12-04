@@ -26,6 +26,8 @@ model User {
   wifiSSID            String?
   bluetoothEnabled    Boolean            @default(false)
   bluetoothDeviceName String?
+  mobileDataEnabled   Boolean            @default(false)
+  meterSerialNumber   String?            // Numéro de série du compteur Enedis
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
   accounts            Account[]
@@ -47,6 +49,14 @@ model User {
   expenses            Expense[]
   budgets             Budget[]
   dashboardWidgets    DashboardWidget[]
+  eweLinkCredentials EWeLinkCredentials?
+  securityDevices     SecurityDevice[]
+  energyConsumptions  EnergyConsumption[]
+  enedisCredentials  EnedisCredentials?
+  siceaCredentials    SiceaCredentials?
+  totpSecret         TotpSecret?
+  trustedDevices      TrustedDevice[]
+  securityLogs        SecurityLog[]
 }
 
 model Account {
@@ -330,6 +340,12 @@ enum DeviceType {
   MEDIA
   OUTLET
   SENSOR
+  CAMERA
+  MOTION_DETECTOR
+  SMOKE_DETECTOR
+  DOOR_SENSOR
+  WINDOW_SENSOR
+  ALARM
   OTHER
 }
 
@@ -545,4 +561,211 @@ model DashboardWidget {
   @@unique([userId, widgetType])
   @@index([userId, position])
   @@index([userId, visible])
+}
+
+model EWeLinkCredentials {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime?
+  region       String   @default("eu") // eu, us, cn
+  appId        String?  // App ID eWeLink
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum SecurityDeviceType {
+  CAMERA
+  MOTION_DETECTOR
+  SMOKE_DETECTOR
+  DOOR_SENSOR
+  WINDOW_SENSOR
+  ALARM
+  GAS_DETECTOR
+  WATER_LEAK_DETECTOR
+  GLASS_BREAK_DETECTOR
+}
+
+enum SecurityProvider {
+  TUYA
+  ZIGBEE
+  SONOFF
+  RTSP
+  ONVIF
+  EZVIZ
+  NETATMO
+  SOMFY
+  LEGRAND
+  OTHER
+}
+
+enum SecurityDeviceStatus {
+  ONLINE
+  OFFLINE
+  ALARM
+  TRIGGERED
+  DISARMED
+}
+
+model SecurityDevice {
+  id              String                @id @default(cuid())
+  userId          String
+  name            String
+  type            SecurityDeviceType
+  provider        SecurityProvider
+  externalId      String?                // ID externe (Tuya, Zigbee, etc.)
+  room            String?
+  status          SecurityDeviceStatus   @default(OFFLINE)
+  isArmed         Boolean               @default(true)
+  isEnabled       Boolean               @default(true)
+  connectionType  String?               // "wifi", "zigbee", "z-wave", "rtsp", "onvif"
+  connectionUrl   String?               // URL RTSP/ONVIF pour les caméras
+  credentials     Json?                  // Credentials sécurisés (username, password, etc.)
+  capabilities    Json?                  // Capacités de l'appareil
+  metadata        Json?                  // Métadonnées supplémentaires
+  lastSeenAt      DateTime?
+  lastTriggeredAt DateTime?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@index([userId, status])
+  @@index([userId, provider])
+}
+
+model EnedisCredentials {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  meterSerialNumber String // Numéro de série du compteur (chiffré)
+  rpm             String?  // Numéro RPM (Relevé de Puissance Maximale) - chiffré
+  linkyToken      String?  // Token d'accès Linky (@bokub/linky) - chiffré
+  accessToken     String?  // Token d'accès Enedis (si nécessaire) - chiffré
+  refreshToken    String?  // Refresh token - chiffré
+  expiresAt       DateTime?
+  pdl             String?  // Point de Livraison (PDL)
+  consentGiven    Boolean  @default(false) // Consentement RGPD pour l'utilisation des données
+  consentDate     DateTime? // Date du consentement
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model EnergyConsumption {
+  id              String   @id @default(cuid())
+  userId          String
+  date            DateTime
+  value           Float    // Consommation en kWh
+  cost            Float?   // Coût estimé en €
+  peakHours       Float?   // Consommation heures pleines
+  offPeakHours    Float?   // Consommation heures creuses
+  source          String   @default("enedis") // "enedis", "sicea", "manual", "smart_meter"
+  metadata        Json?    // Données supplémentaires
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@index([userId])
+}
+
+// Modèle pour les identifiants SICEA (chiffrés)
+model SiceaCredentials {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  username        String   // Nom d'utilisateur SICEA (chiffré)
+  password        String   // Mot de passe SICEA (chiffré)
+  contractNumber  String?  // Numéro de contrat (chiffré)
+  lastScrapedAt   DateTime? // Dernière récupération réussie
+  lastError       String?  // Dernière erreur rencontrée
+  isActive        Boolean  @default(true)
+  consentGiven    Boolean  @default(false) // Consentement RGPD
+  consentDate     DateTime? // Date du consentement
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scrapingJobs    SiceaScrapingJob[]
+
+  @@index([userId])
+  @@index([isActive])
+}
+
+// Modèle pour les jobs de scraping SICEA
+model SiceaScrapingJob {
+  id              String   @id @default(cuid())
+  credentialsId   String
+  status          String   @default("pending") // "pending", "running", "success", "failed"
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  dataRetrieved   Json?    // Données récupérées (kWh, courbe de charge, etc.)
+  error           String?  // Erreur si échec
+  metadata        Json?    // Métadonnées supplémentaires
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  credentials     SiceaCredentials @relation(fields: [credentialsId], references: [id], onDelete: Cascade)
+
+  @@index([credentialsId, status])
+  @@index([startedAt])
+}
+
+// Modèle pour la double authentification TOTP
+model TotpSecret {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  secret          String   // Secret TOTP (chiffré)
+  isEnabled       Boolean  @default(false)
+  backupCodes     Json?    // Codes de secours (chiffrés)
+  lastUsedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Modèle pour les appareils de confiance
+model TrustedDevice {
+  id              String   @id @default(cuid())
+  userId          String
+  deviceId        String   // Identifiant unique de l'appareil
+  deviceName      String   // Nom de l'appareil (ex: "iPhone 15 Pro")
+  deviceType      String?  // "mobile", "tablet", "desktop", "browser"
+  userAgent       String?  // User agent de l'appareil
+  ipAddress       String?  // Dernière adresse IP (pour surveillance)
+  lastSeenAt      DateTime @default(now())
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId])
+  @@index([userId, isActive])
+  @@index([lastSeenAt])
+}
+
+// Modèle pour les logs de sécurité
+model SecurityLog {
+  id              String   @id @default(cuid())
+  userId          String?
+  eventType       String   // "login", "totp_verify", "device_added", "suspicious_activity", etc.
+  severity        String   @default("info") // "info", "warning", "error", "critical"
+  ipAddress       String?
+  userAgent       String?
+  deviceId        String?
+  details         Json?    // Détails de l'événement
+  metadata        Json?    // Métadonnées supplémentaires
+  createdAt       DateTime @default(now())
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([severity, createdAt])
+  @@index([ipAddress])
 }

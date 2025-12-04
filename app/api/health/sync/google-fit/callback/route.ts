@@ -8,13 +8,13 @@ import { setHealthSyncConfig } from "@/app/lib/health/sync";
  * Échange le code d'autorisation contre un token et configure la synchronisation
  */
 export async function GET(request: NextRequest) {
+  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+  
   try {
     const user = await requireUser();
     const { searchParams } = new URL(request.url);
     const code = searchParams.get("code");
     const error = searchParams.get("error");
-
-    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
 
     if (error) {
       return NextResponse.redirect(
@@ -58,13 +58,11 @@ export async function GET(request: NextRequest) {
     });
 
     // Rediriger vers le profil avec succès
-    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
     return NextResponse.redirect(
       `${baseUrl}/profile?success=google_fit_connected&message=${encodeURIComponent("Compte Google Fit connecté avec succès")}`
     );
   } catch (error) {
     console.error("[GET /api/health/sync/google-fit/callback]", error);
-    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
     return NextResponse.redirect(
       `${baseUrl}/profile?error=google_fit_auth_error&message=${encodeURIComponent(
         error instanceof Error ? error.message : "Erreur inconnue"

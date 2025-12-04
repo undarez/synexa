@@ -96,7 +96,7 @@ export function DailyBrief() {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+          <Loader2 className="h-8 w-8 animate-spin text-[hsl(var(--muted-foreground))]" />
         </CardContent>
       </Card>
     );
@@ -119,7 +119,7 @@ export function DailyBrief() {
   return (
     <div className="space-y-4">
       {/* En-tête avec salutation */}
-      <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-200 dark:border-blue-800">
+      <Card className="bg-gradient-to-br from-blue-50/80 to-indigo-50/80 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-300 dark:border-blue-800">
         <CardHeader>
           <CardTitle className="text-2xl">
             {brief.greeting} ! 👋
@@ -129,7 +129,7 @@ export function DailyBrief() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-zinc-700 dark:text-zinc-300">{brief.summary}</p>
+          <p className="text-[hsl(var(--foreground))]">{brief.summary}</p>
         </CardContent>
       </Card>
 
@@ -146,7 +146,7 @@ export function DailyBrief() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="text-3xl font-bold">{brief.weather.current.temperature}°C</p>
-                <p className="text-sm text-zinc-600 dark:text-zinc-400 capitalize">
+                <p className="text-sm text-[hsl(var(--muted-foreground))] capitalize">
                   {brief.weather.current.description}
                 </p>
               </div>
@@ -156,7 +156,7 @@ export function DailyBrief() {
                   <span>{brief.weather.current.humidity}%</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Wind className="h-4 w-4 text-gray-500" />
+                  <Wind className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
                   <span>{brief.weather.current.windSpeed} km/h</span>
                 </div>
               </div>
@@ -165,7 +165,7 @@ export function DailyBrief() {
               <div className="grid grid-cols-3 gap-2 pt-4 border-t">
                 {brief.weather.forecast.map((day, idx) => (
                   <div key={idx} className="text-center">
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-xs text-[hsl(var(--muted-foreground))]">
                       {idx === 0 ? "Demain" : format(new Date(day.date), "EEE", { locale: fr })}
                     </p>
                     <p className="font-semibold">
@@ -232,32 +232,32 @@ export function DailyBrief() {
             <div className="space-y-3">
               {brief.tasks.overdue.length > 0 && (
                 <div>
-                  <p className="text-sm font-semibold text-red-600 dark:text-red-400 mb-2">
+                  <p className="text-sm font-semibold text-red-900 dark:text-red-400 mb-2">
                     ⚠️ En retard ({brief.tasks.overdue.length})
                   </p>
                   {brief.tasks.overdue.slice(0, 3).map((task) => (
                     <div
                       key={task.id}
-                      className="flex items-center gap-2 rounded-lg bg-red-50 p-2 dark:bg-red-950/20 mb-2"
+                      className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 dark:bg-red-950/20 dark:border-red-900 p-2 mb-2"
                     >
-                      <AlertCircle className="h-4 w-4 text-red-500" />
-                      <span className="text-sm">{task.title}</span>
+                      <AlertCircle className="h-4 w-4 text-red-700 dark:text-red-400" />
+                      <span className="text-sm text-[hsl(var(--foreground))]">{task.title}</span>
                     </div>
                   ))}
                 </div>
               )}
               {brief.tasks.highPriority.length > 0 && (
                 <div>
-                  <p className="text-sm font-semibold text-yellow-600 dark:text-yellow-400 mb-2">
+                  <p className="text-sm font-semibold text-yellow-900 dark:text-yellow-400 mb-2">
                     🔥 Priorité haute ({brief.tasks.highPriority.length})
                   </p>
                   {brief.tasks.highPriority.slice(0, 3).map((task) => (
                     <div
                       key={task.id}
-                      className="flex items-center gap-2 rounded-lg bg-yellow-50 p-2 dark:bg-yellow-950/20 mb-2"
+                      className="flex items-center gap-2 rounded-lg bg-yellow-50 border border-yellow-200 dark:bg-yellow-950/20 dark:border-yellow-900 p-2 mb-2"
                     >
-                      <Zap className="h-4 w-4 text-yellow-500" />
-                      <span className="text-sm">{task.title}</span>
+                      <Zap className="h-4 w-4 text-yellow-700 dark:text-yellow-400" />
+                      <span className="text-sm text-[hsl(var(--foreground))]">{task.title}</span>
                     </div>
                   ))}
                 </div>
@@ -270,9 +270,9 @@ export function DailyBrief() {
                   {brief.tasks.today.slice(0, 3).map((task) => (
                     <div
                       key={task.id}
-                      className="flex items-center gap-2 rounded-lg bg-zinc-100 p-2 dark:bg-zinc-800 mb-2"
+                      className="flex items-center gap-2 rounded-lg bg-[hsl(var(--muted))] p-2 mb-2"
                     >
-                      <CheckCircle2 className="h-4 w-4 text-zinc-400" />
+                      <CheckCircle2 className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
                       <span className="text-sm">{task.title}</span>
                     </div>
                   ))}
@@ -304,10 +304,10 @@ export function DailyBrief() {
                   key={idx}
                   className="flex items-start gap-2 rounded-lg bg-blue-50 p-3 dark:bg-blue-950/20"
                 >
-                  <MapPin className="h-4 w-4 mt-0.5 text-blue-500" />
+                  <MapPin className="h-4 w-4 mt-0.5 text-blue-700 dark:text-blue-400" />
                   <div className="flex-1">
-                    <p className="text-sm font-medium">{item.suggestion}</p>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-sm font-medium text-[hsl(var(--foreground))]">{item.suggestion}</p>
+                    <p className="text-xs text-[hsl(var(--muted-foreground))]">
                       {format(new Date(item.event.start), "HH:mm")}
                     </p>
                   </div>
@@ -316,19 +316,19 @@ export function DailyBrief() {
               {brief.suggestions.tasks?.map((item, idx) => (
                 <div
                   key={idx}
-                  className="flex items-start gap-2 rounded-lg bg-yellow-50 p-3 dark:bg-yellow-950/20"
+                  className="flex items-start gap-2 rounded-lg bg-yellow-50 border border-yellow-200 dark:bg-yellow-950/20 dark:border-yellow-900 p-3"
                 >
-                  <AlertCircle className="h-4 w-4 mt-0.5 text-yellow-500" />
-                  <p className="text-sm">{item.suggestion}</p>
+                  <AlertCircle className="h-4 w-4 mt-0.5 text-yellow-700 dark:text-yellow-400" />
+                  <p className="text-sm text-[hsl(var(--foreground))]">{item.suggestion}</p>
                 </div>
               ))}
               {brief.suggestions.routines?.map((item, idx) => (
                 <div
                   key={idx}
-                  className="flex items-start gap-2 rounded-lg bg-green-50 p-3 dark:bg-green-950/20"
+                  className="flex items-start gap-2 rounded-lg bg-green-50 border border-green-200 dark:bg-green-950/20 dark:border-green-900 p-3"
                 >
-                  <Zap className="h-4 w-4 mt-0.5 text-green-500" />
-                  <p className="text-sm">{item.suggestion}</p>
+                  <Zap className="h-4 w-4 mt-0.5 text-green-700 dark:text-green-400" />
+                  <p className="text-sm text-[hsl(var(--foreground))]">{item.suggestion}</p>
                 </div>
               ))}
             </div>
@@ -352,10 +352,10 @@ export function DailyBrief() {
                   key={reminder.id}
                   className="flex items-center gap-2 rounded-lg border border-zinc-200 p-2 dark:border-zinc-800"
                 >
-                  <Clock className="h-4 w-4 text-zinc-400" />
+                  <Clock className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
                   <div className="flex-1">
                     <p className="text-sm">{reminder.message}</p>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-xs text-[hsl(var(--muted-foreground))]">
                       {format(new Date(reminder.scheduledFor), "HH:mm")}
                     </p>
                   </div>

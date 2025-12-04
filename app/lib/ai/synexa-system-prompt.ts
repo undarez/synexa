@@ -78,3 +78,7 @@ export function getSynexaSystemPromptWithContext(
   return `${basePrompt}${habitsContext}${preferencesContext}${activityContext}`;
 }
 
+
+
+
+

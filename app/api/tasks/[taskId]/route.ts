@@ -52,6 +52,9 @@ export async function PATCH(
       updateData.completed = body.completed;
       if (body.completed && !task.completed) {
         updateData.completedAt = new Date();
+        // Mettre à jour l'estimation de durée après complétion
+        const { updateDurationEstimate } = await import("@/app/lib/tasks/duration-estimator");
+        updateDurationEstimate(user.id, taskId).catch(console.error);
       } else if (!body.completed) {
         updateData.completedAt = null;
       }

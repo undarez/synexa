@@ -23,3 +23,7 @@ CREATE INDEX "DashboardWidget_userId_position_idx" ON "DashboardWidget"("userId"
 -- CreateIndex
 CREATE INDEX "DashboardWidget_userId_visible_idx" ON "DashboardWidget"("userId", "visible");
 
+
+
+
+

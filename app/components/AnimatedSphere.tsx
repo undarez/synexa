@@ -116,21 +116,21 @@ export function AnimatedSphere({ className = "", size = 300 }: AnimatedSpherePro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMounted, size]);
 
+  // Rendre toujours la même structure pour éviter l'erreur d'hydratation
+  // Le canvas est toujours présent mais masqué si pas monté
   return (
     <div className={`relative ${className}`} suppressHydrationWarning>
       <canvas
         ref={canvasRef}
         className="h-full w-full"
-        style={{ imageRendering: "auto", display: isMounted ? "block" : "none" }}
+        style={{ 
+          imageRendering: "auto",
+          opacity: isMounted ? 1 : 0,
+          pointerEvents: isMounted ? "auto" : "none"
+        }}
       />
-      {/* Effet de brillance */}
+      {/* Effet de brillance - toujours présent */}
       <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-400/20 via-purple-500/20 to-blue-600/20 blur-3xl" />
-      {!isMounted && (
-        // Placeholder pendant le montage pour éviter l'erreur d'hydratation
-        <div className="h-full w-full flex items-center justify-center">
-          <div className="rounded-full bg-gradient-to-br from-blue-400/20 via-purple-500/20 to-blue-600/20 blur-3xl h-full w-full" />
-        </div>
-      )}
     </div>
   );
 }

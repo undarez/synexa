@@ -35,13 +35,18 @@ export async function searchNews(
 
   try {
     // Essayer NewsAPI si disponible (gratuit avec limites)
-    if (process.env.NEWS_API_KEY) {
+    // Note: NewsAPI nécessite soit un query, soit des paramètres spécifiques
+    // Si on a seulement une catégorie sans query, on saute NewsAPI
+    if (process.env.NEWS_API_KEY && (query || (!category && !query))) {
       try {
-        const newsApiResults = await searchNewsAPI(query, category, language);
+        const newsApiResults = await searchNewsAPI(query || "news", category, language);
         articles.push(...newsApiResults.articles);
         sources.push(...newsApiResults.sources);
       } catch (error) {
-        console.warn("[News] Erreur NewsAPI:", error);
+        // Erreur silencieuse, on utilise les fallbacks
+        if (!(error instanceof Error && error.message.includes("invalid request"))) {
+          console.warn("[News] Erreur NewsAPI:", error);
+        }
       }
     }
 
@@ -127,7 +132,14 @@ async function searchNewsAPI(
   );
 
   if (!response.ok) {
-    throw new Error(`NewsAPI error: ${response.status}`);
+    const errorData = await response.json().catch(() => ({}));
+    // NewsAPI retourne 400 si la requête est invalide (ex: query vide avec category)
+    // On ignore silencieusement cette erreur et on utilise les fallbacks
+    if (response.status === 400) {
+      console.warn("[News] NewsAPI: Requête invalide, utilisation des fallbacks");
+      throw new Error("NewsAPI invalid request");
+    }
+    throw new Error(`NewsAPI error: ${response.status} - ${errorData.message || ""}`);
   }
 
   const data = await response.json();

@@ -18,8 +18,115 @@ import {
 } from "@/app/components/ui/select";
 import type { Task, TaskPriority, TaskContext } from "@prisma/client";
 import { Footer } from "@/app/components/Footer";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 
 type GroupByOption = "none" | "priority" | "context" | "due";
+
+// Composant pour l'affichage groupé
+function GroupedTasksDisplay({
+  tasks,
+  groupBy,
+  onEdit,
+  onDelete,
+  onToggleComplete,
+}: {
+  tasks: Task[];
+  groupBy: GroupByOption;
+  onEdit: (task: Task) => void;
+  onDelete: (taskId: string) => void;
+  onToggleComplete: (taskId: string, completed: boolean) => void;
+}) {
+  const grouped: Record<string, Task[]> = {};
+  
+  tasks.forEach((task) => {
+    let key = "";
+    if (groupBy === "priority") {
+      key = task.priority;
+    } else if (groupBy === "context") {
+      key = task.context;
+    } else if (groupBy === "due") {
+      if (task.due) {
+        const date = new Date(task.due);
+        key = date.toISOString().split("T")[0];
+      } else {
+        key = "Sans date";
+      }
+    }
+    if (!grouped[key]) {
+      grouped[key] = [];
+    }
+    grouped[key].push(task);
+  });
+
+  const getGroupLabel = (key: string): string => {
+    if (groupBy === "priority") {
+      const labels: Record<string, string> = { HIGH: "Haute priorité", MEDIUM: "Priorité moyenne", LOW: "Basse priorité" };
+      return labels[key] || key;
+    } else if (groupBy === "context") {
+      const labels: Record<string, string> = {
+        WORK: "Travail", PERSONAL: "Personnel", SHOPPING: "Courses", HEALTH: "Santé",
+        FINANCE: "Finance", HOME: "Maison", SOCIAL: "Social", LEARNING: "Apprentissage", OTHER: "Autre"
+      };
+      return labels[key] || key;
+    } else if (groupBy === "due") {
+      if (key === "Sans date") return "Sans date d'échéance";
+      const date = new Date(key);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const taskDate = new Date(date);
+      taskDate.setHours(0, 0, 0, 0);
+      
+      if (taskDate.getTime() === today.getTime()) {
+        return "Aujourd'hui";
+      } else if (taskDate < today) {
+        return `En retard (${format(date, "PPP", { locale: fr })})`;
+      } else {
+        return format(date, "PPP", { locale: fr });
+      }
+    }
+    return key;
+  };
+
+  const sortedKeys = Object.keys(grouped).sort((a, b) => {
+    if (groupBy === "priority") {
+      const order: Record<string, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+      return (order[a] || 99) - (order[b] || 99);
+    } else if (groupBy === "due") {
+      if (a === "Sans date") return 1;
+      if (b === "Sans date") return -1;
+      return new Date(a).getTime() - new Date(b).getTime();
+    }
+    return a.localeCompare(b);
+  });
+
+  return (
+    <div className="space-y-6">
+      {sortedKeys.map((key) => (
+        <Card key={key} className="border-[hsl(var(--border))] bg-gradient-to-br from-[hsl(var(--card))] to-[hsl(var(--card-foreground))]/5">
+          <CardHeader>
+            <CardTitle className="text-lg">
+              {getGroupLabel(key)} ({grouped[key].length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {grouped[key].map((task) => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  onToggleComplete={onToggleComplete}
+                />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
 
 export default function TasksPage() {
   const { data: session, status } = useSession();
@@ -34,6 +141,7 @@ export default function TasksPage() {
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | "all">("all");
   const [contextFilter, setContextFilter] = useState<TaskContext | "all">("all");
   const [groupBy, setGroupBy] = useState<GroupByOption>("none");
+  const [groupingSuggestions, setGroupingSuggestions] = useState<Array<{ type: string; label: string; reason: string; confidence: number }>>([]);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -76,8 +184,21 @@ export default function TasksPage() {
   useEffect(() => {
     if (status === "authenticated") {
       fetchTasks();
+      fetchGroupingSuggestions();
     }
   }, [status, showCompleted, priorityFilter, contextFilter, groupBy]);
+
+  const fetchGroupingSuggestions = async () => {
+    try {
+      const response = await fetch("/api/tasks/grouping-suggestions");
+      if (response.ok) {
+        const data = await response.json();
+        setGroupingSuggestions(data.suggestions || []);
+      }
+    } catch (err) {
+      // Ignorer les erreurs silencieusement
+    }
+  };
 
   const handleDelete = async (taskId: string) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cette tâche ?")) {
@@ -156,19 +277,19 @@ export default function TasksPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen bg-[hsl(var(--background))]">
       <Navigation />
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8 flex items-center justify-between">
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50">
+            <h1 className="text-2xl sm:text-3xl font-bold text-[hsl(var(--foreground))]">
               Mes tâches
             </h1>
-            <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+            <p className="mt-2 text-sm sm:text-base text-[hsl(var(--muted-foreground))]">
               Gérez vos tâches avec priorité, contexte et durée estimée
             </p>
           </div>
-          <Button onClick={() => setFormOpen(true)}>
+          <Button onClick={() => setFormOpen(true)} className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             Nouvelle tâche
           </Button>
@@ -255,6 +376,21 @@ export default function TasksPage() {
                     <SelectItem value="due">Date d'échéance</SelectItem>
                   </SelectContent>
                 </Select>
+                {groupingSuggestions.length > 0 && groupBy === "none" && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs font-medium text-[hsl(var(--muted-foreground))]">💡 Suggestions :</p>
+                    {groupingSuggestions.slice(0, 2).map((suggestion, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setGroupBy(suggestion.type as GroupByOption)}
+                        className="block w-full text-left text-xs text-[hsl(var(--primary))] hover:underline"
+                        title={suggestion.reason}
+                      >
+                        {suggestion.label} ({Math.round(suggestion.confidence * 100)}%)
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
@@ -285,44 +421,57 @@ export default function TasksPage() {
           </Card>
         ) : (
           <div className="space-y-6">
-            {/* Tâches actives */}
-            {activeTasks.length > 0 && (
-              <div>
-                <h2 className="mb-4 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-                  Tâches actives ({activeTasks.length})
-                </h2>
-                <div className="space-y-3">
-                  {activeTasks.map((task) => (
-                    <TaskItem
-                      key={task.id}
-                      task={task}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                      onToggleComplete={handleToggleComplete}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Affichage groupé si activé */}
+            {groupBy !== "none" ? (
+              <GroupedTasksDisplay
+                tasks={tasks}
+                groupBy={groupBy}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onToggleComplete={handleToggleComplete}
+              />
+            ) : (
+              <>
+                {/* Tâches actives */}
+                {activeTasks.length > 0 && (
+                  <div>
+                    <h2 className="mb-4 text-lg sm:text-xl font-semibold text-[hsl(var(--foreground))]">
+                      Tâches actives ({activeTasks.length})
+                    </h2>
+                    <div className="space-y-3">
+                      {activeTasks.map((task) => (
+                        <TaskItem
+                          key={task.id}
+                          task={task}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
+                          onToggleComplete={handleToggleComplete}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-            {/* Tâches complétées */}
-            {showCompleted && completedTasks.length > 0 && (
-              <div>
-                <h2 className="mb-4 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-                  Tâches complétées ({completedTasks.length})
-                </h2>
-                <div className="space-y-3">
-                  {completedTasks.map((task) => (
-                    <TaskItem
-                      key={task.id}
-                      task={task}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                      onToggleComplete={handleToggleComplete}
-                    />
-                  ))}
-                </div>
-              </div>
+                {/* Tâches complétées */}
+                {showCompleted && completedTasks.length > 0 && (
+                  <div>
+                    <h2 className="mb-4 text-lg sm:text-xl font-semibold text-[hsl(var(--foreground))]">
+                      Tâches complétées ({completedTasks.length})
+                    </h2>
+                    <div className="space-y-3">
+                      {completedTasks.map((task) => (
+                        <TaskItem
+                          key={task.id}
+                          task={task}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
+                          onToggleComplete={handleToggleComplete}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

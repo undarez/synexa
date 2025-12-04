@@ -91,6 +91,26 @@ export function GoogleCalendarSync() {
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
       
+      // Initialiser automatiquement les webhooks après la première synchronisation
+      // (uniquement en production avec HTTPS)
+      try {
+        const watchResponse = await fetch("/api/calendar/watch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ calendarId: "primary" }),
+        });
+        const watchData = await watchResponse.json();
+        if (watchResponse.ok && !watchData.development) {
+          console.log("[Calendar] Webhooks initialisés automatiquement");
+        } else if (watchData.development) {
+          // En développement, c'est normal que les webhooks ne fonctionnent pas
+          console.log("[Calendar] Webhooks non disponibles en développement (HTTPS requis)");
+        }
+      } catch (watchError) {
+        console.warn("[Calendar] Erreur initialisation webhooks:", watchError);
+        // Ne pas bloquer si les webhooks échouent
+      }
+      
       // Recharger la page pour afficher les nouveaux événements
       if (data.synced > 0) {
         setTimeout(() => {

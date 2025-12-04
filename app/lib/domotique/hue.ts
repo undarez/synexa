@@ -341,3 +341,7 @@ function kelvinToMired(kelvin: number): number {
 }
 
 
+
+
+
+

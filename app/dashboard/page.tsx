@@ -14,6 +14,7 @@ import { ChatInterface } from "@/app/components/ChatInterface";
 import { PersonalizedRecommendations } from "@/app/components/PersonalizedRecommendations";
 import { WellnessDashboard } from "@/app/components/WellnessDashboard";
 import { DashboardWidgetManager } from "@/app/components/DashboardWidgetManager";
+import { SynexaProactiveSuggestions } from "@/app/components/SynexaProactiveSuggestions";
 
 async function getUserDisplayName(userId: string): Promise<string> {
   try {
@@ -110,6 +111,11 @@ export default async function Dashboard() {
           <p className="mt-2 text-[hsl(var(--muted-foreground))]">
             Voici votre aperçu du jour
           </p>
+        </div>
+
+        {/* Suggestions proactives de Synexa */}
+        <div className="mb-6">
+          <SynexaProactiveSuggestions maxSuggestions={3} autoRefresh={true} />
         </div>
 
         {/* Gestionnaire de widgets personnalisables */}

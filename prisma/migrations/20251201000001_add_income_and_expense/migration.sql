@@ -62,3 +62,7 @@ CREATE INDEX "Expense_userId_category_idx" ON "Expense"("userId", "category");
 CREATE INDEX "Expense_userId_frequency_idx" ON "Expense"("userId", "frequency");
 
 
+
+
+
+

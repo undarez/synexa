@@ -46,3 +46,7 @@ CREATE INDEX "Bill_userId_category_idx" ON "Bill"("userId", "category");
 CREATE INDEX "Bill_status_dueDate_idx" ON "Bill"("status", "dueDate");
 
 
+
+
+
+

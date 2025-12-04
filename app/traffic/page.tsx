@@ -74,6 +74,111 @@ export default function TrafficPage() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Obtenir la position automatiquement au chargement
+  useEffect(() => {
+    if (status === "authenticated" && !userLocation && !locationLoading) {
+      // Timeout de sécurité pour éviter un chargement infini
+      let timeoutId: NodeJS.Timeout | null = null;
+      
+      timeoutId = setTimeout(() => {
+        console.warn("Timeout géolocalisation, utilisation de Paris par défaut");
+        const defaultLocation = { lat: 48.8566, lng: 2.3522 }; // Paris
+        setUserLocation(defaultLocation);
+        setLocationLoading(false);
+        fetchTrafficAroundLocation(defaultLocation.lat, defaultLocation.lng);
+      }, 8000);
+
+      // Essayer d'abord de récupérer depuis le profil
+      fetch("/api/profile")
+        .then((response) => {
+          if (response.ok) {
+            return response.json();
+          }
+          throw new Error("Profil non disponible");
+        })
+        .then((data) => {
+          const workLat = data.profile?.workLat;
+          const workLng = data.profile?.workLng;
+          
+          if (workLat && workLng) {
+            if (timeoutId) clearTimeout(timeoutId);
+            const profileLocation = { lat: workLat, lng: workLng };
+            setUserLocation(profileLocation);
+            setLocationLoading(false);
+            fetchTrafficAroundLocation(profileLocation.lat, profileLocation.lng);
+            return;
+          }
+          
+          // Sinon, utiliser la géolocalisation du navigateur
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                if (timeoutId) clearTimeout(timeoutId);
+                const { latitude, longitude } = position.coords;
+                const geoLocation = { lat: latitude, lng: longitude };
+                setUserLocation(geoLocation);
+                setLocationLoading(false);
+                fetchTrafficAroundLocation(geoLocation.lat, geoLocation.lng);
+              },
+              () => {
+                // En cas d'erreur, utiliser Paris par défaut
+                if (timeoutId) clearTimeout(timeoutId);
+                const defaultLocation = { lat: 48.8566, lng: 2.3522 };
+                setUserLocation(defaultLocation);
+                setLocationLoading(false);
+                fetchTrafficAroundLocation(defaultLocation.lat, defaultLocation.lng);
+              },
+              {
+                enableHighAccuracy: true,
+                timeout: 5000,
+                maximumAge: 60000,
+              }
+            );
+          } else {
+            // Géolocalisation non supportée, utiliser Paris
+            if (timeoutId) clearTimeout(timeoutId);
+            const defaultLocation = { lat: 48.8566, lng: 2.3522 };
+            setUserLocation(defaultLocation);
+            setLocationLoading(false);
+            fetchTrafficAroundLocation(defaultLocation.lat, defaultLocation.lng);
+          }
+        })
+        .catch(() => {
+          // En cas d'erreur, utiliser la géolocalisation du navigateur
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                if (timeoutId) clearTimeout(timeoutId);
+                const { latitude, longitude } = position.coords;
+                const geoLocation = { lat: latitude, lng: longitude };
+                setUserLocation(geoLocation);
+                setLocationLoading(false);
+                fetchTrafficAroundLocation(geoLocation.lat, geoLocation.lng);
+              },
+              () => {
+                if (timeoutId) clearTimeout(timeoutId);
+                const defaultLocation = { lat: 48.8566, lng: 2.3522 };
+                setUserLocation(defaultLocation);
+                setLocationLoading(false);
+                fetchTrafficAroundLocation(defaultLocation.lat, defaultLocation.lng);
+              },
+              {
+                enableHighAccuracy: true,
+                timeout: 5000,
+                maximumAge: 60000,
+              }
+            );
+          } else {
+            if (timeoutId) clearTimeout(timeoutId);
+            const defaultLocation = { lat: 48.8566, lng: 2.3522 };
+            setUserLocation(defaultLocation);
+            setLocationLoading(false);
+            fetchTrafficAroundLocation(defaultLocation.lat, defaultLocation.lng);
+          }
+        });
+    }
+  }, [status]);
+
   // Obtenir la position actuelle
   const getCurrentLocation = () => {
     setLocationLoading(true);
@@ -322,12 +427,12 @@ export default function TrafficPage() {
           </Card>
 
           {/* Carte */}
-          {trafficData && userLocation && (
+          {userLocation && (
             <TrafficMap
               userLocation={userLocation}
-              destinationLocation={trafficData.destinationLocation}
-              routes={trafficData.routes || []}
-              incidents={trafficData.incidents || []}
+              destinationLocation={trafficData?.destinationLocation || null}
+              routes={trafficData?.routes || []}
+              incidents={trafficData?.incidents || []}
             />
           )}
 

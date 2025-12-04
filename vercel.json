@@ -1,0 +1,21 @@
+{
+  "crons": [
+    {
+      "path": "/api/energy/sicea/auto-scrape",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/health/sync/auto",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/reminders/process",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/calendar/auto-sync",
+      "schedule": "0 * * * *"
+    }
+  ]
+}
+

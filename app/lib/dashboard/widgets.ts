@@ -16,7 +16,9 @@ export type WidgetType =
   | "dailyBrief"
   | "voiceCommand"
   | "chatInterface"
-  | "networkDetector";
+  | "networkDetector"
+  | "security"
+  | "energy";
 
 export type WidgetSize = "small" | "medium" | "large";
 
@@ -144,6 +146,30 @@ export const AVAILABLE_WIDGETS: WidgetDefinition[] = [
     defaultSize: "small",
     category: "domotique",
   },
+  {
+    id: "news",
+    name: "Actualités",
+    description: "Les dernières actualités",
+    icon: "Newspaper",
+    defaultSize: "medium",
+    category: "communication",
+  },
+  {
+    id: "security",
+    name: "Sécurité",
+    description: "Centre de contrôle de sécurité",
+    icon: "Shield",
+    defaultSize: "medium",
+    category: "domotique",
+  },
+  {
+    id: "energy",
+    name: "Énergie",
+    description: "Consommation électrique",
+    icon: "Zap",
+    defaultSize: "medium",
+    category: "domotique",
+  },
 ];
 
 /**
@@ -162,4 +188,6 @@ export function getDefaultWidgets(): WidgetConfig[] {
     { widgetType: "routines", size: "small", position: 8, column: 3, row: 7, visible: true },
   ];
 }
+
+
 

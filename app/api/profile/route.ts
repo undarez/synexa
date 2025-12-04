@@ -30,6 +30,8 @@ export async function GET() {
           wifiSSID: true,
           bluetoothEnabled: true,
           bluetoothDeviceName: true,
+          mobileDataEnabled: true,
+          meterSerialNumber: true,
         },
       });
 
@@ -175,6 +177,8 @@ export async function PATCH(request: NextRequest) {
       wifiSSID?: string;
       bluetoothEnabled?: boolean;
       bluetoothDeviceName?: string;
+      mobileDataEnabled?: boolean;
+      meterSerialNumber?: string;
     } = {};
 
     if (body.pseudo !== undefined) {
@@ -209,6 +213,12 @@ export async function PATCH(request: NextRequest) {
     }
     if (body.bluetoothDeviceName !== undefined) {
       updateData.bluetoothDeviceName = body.bluetoothDeviceName.trim() || null;
+    }
+    if (body.mobileDataEnabled !== undefined) {
+      updateData.mobileDataEnabled = Boolean(body.mobileDataEnabled);
+    }
+    if (body.meterSerialNumber !== undefined) {
+      updateData.meterSerialNumber = body.meterSerialNumber.trim() || null;
     }
 
     // Chiffrer les données sensibles avant sauvegarde
@@ -282,6 +292,8 @@ export async function PATCH(request: NextRequest) {
           wifiSSID: true,
           bluetoothEnabled: true,
           bluetoothDeviceName: true,
+          mobileDataEnabled: true,
+          meterSerialNumber: true,
         },
       });
 

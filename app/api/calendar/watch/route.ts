@@ -68,44 +68,76 @@ export async function POST(request: NextRequest) {
 
     // Créer un nouveau channel
     const channelId = randomUUID();
-    const webhookUrl = `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/calendar/webhook`;
+    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+    const webhookUrl = `${baseUrl}/api/calendar/webhook`;
 
-    // Appeler l'API Google pour créer le watch
-    const watchResponse = await watchGoogleCalendar(
-      {
-        accessToken: account.access_token,
-        refreshToken: account.refresh_token,
-        expiryDate: account.expires_at,
-      },
-      {
-        calendarId,
-        webhookUrl,
-        channelId,
+    // Vérifier si on est en développement (HTTP) - Google nécessite HTTPS pour les webhooks
+    const isDevelopment = baseUrl.startsWith("http://");
+    
+    if (isDevelopment) {
+      // En développement, on ne peut pas initialiser les webhooks (Google nécessite HTTPS)
+      // On retourne un message informatif
+      return NextResponse.json(
+        {
+          message: "Les webhooks ne sont pas disponibles en développement local (HTTPS requis)",
+          warning: "Les webhooks Google Calendar nécessitent HTTPS. En production, ils seront automatiquement activés.",
+          development: true,
+        },
+        { status: 200 } // 200 car ce n'est pas vraiment une erreur, juste une limitation
+      );
+    }
+
+    // En production (HTTPS), initialiser les webhooks
+    try {
+      const watchResponse = await watchGoogleCalendar(
+        {
+          accessToken: account.access_token,
+          refreshToken: account.refresh_token,
+          expiryDate: account.expires_at,
+        },
+        {
+          calendarId,
+          webhookUrl,
+          channelId,
+        }
+      );
+
+      // Calculer la date d'expiration (7 jours max selon Google, mais on met 6 jours pour être sûr)
+      const expiration = addDays(new Date(), 6);
+
+      // Enregistrer le channel dans la base de données
+      const channel = await prisma.calendarChannel.create({
+        data: {
+          userId: user.id,
+          channelId,
+          resourceId: watchResponse.resourceId || "",
+          calendarId,
+          expiration,
+        },
+      });
+
+      return NextResponse.json({
+        message: "Watch initialisé avec succès",
+        channel: {
+          id: channel.id,
+          channelId: channel.channelId,
+          expiration: channel.expiration,
+        },
+      });
+    } catch (watchError: any) {
+      // Gérer spécifiquement l'erreur HTTPS
+      if (watchError?.message?.includes("HTTPS") || watchError?.code === 400) {
+        return NextResponse.json(
+          {
+            message: "Les webhooks nécessitent HTTPS",
+            error: "Google Calendar nécessite HTTPS pour les webhooks. Assurez-vous que NEXTAUTH_URL utilise HTTPS.",
+            development: baseUrl.includes("localhost"),
+          },
+          { status: 400 }
+        );
       }
-    );
-
-    // Calculer la date d'expiration (7 jours max selon Google, mais on met 6 jours pour être sûr)
-    const expiration = addDays(new Date(), 6);
-
-    // Enregistrer le channel dans la base de données
-    const channel = await prisma.calendarChannel.create({
-      data: {
-        userId: user.id,
-        channelId,
-        resourceId: watchResponse.resourceId || "",
-        calendarId,
-        expiration,
-      },
-    });
-
-    return NextResponse.json({
-      message: "Watch initialisé avec succès",
-      channel: {
-        id: channel.id,
-        channelId: channel.channelId,
-        expiration: channel.expiration,
-      },
-    });
+      throw watchError; // Relancer les autres erreurs
+    }
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: error.message }, { status: 401 });
@@ -150,6 +182,8 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+
 
 
 

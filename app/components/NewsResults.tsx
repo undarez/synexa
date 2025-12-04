@@ -6,6 +6,7 @@ import { ExternalLink, Calendar, Newspaper } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import type { NewsArticle } from "@/app/lib/services/news";
+import { trackNewsActivity } from "@/app/lib/services/news-personalization";
 
 interface NewsResultsProps {
   query: string;
@@ -81,15 +82,27 @@ export function NewsResults({ query, articles, onClose }: NewsResultsProps) {
                 )}
               </div>
 
-              <Button
-                onClick={() => window.open(article.url, "_blank", "noopener,noreferrer")}
-                variant="outline"
-                size="sm"
-                className="w-full sm:w-auto"
-              >
-                <ExternalLink className="mr-2 h-4 w-4" />
-                Lire l'article complet
-              </Button>
+                  <Button
+                    onClick={async () => {
+                      // Track l'activité de consultation
+                      try {
+                        const response = await fetch("/api/news/track", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ article }),
+                        });
+                      } catch (err) {
+                        // Ignorer les erreurs silencieusement
+                      }
+                      window.open(article.url, "_blank", "noopener,noreferrer");
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="w-full sm:w-auto"
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Lire l'article complet
+                  </Button>
             </div>
           ))}
         </div>

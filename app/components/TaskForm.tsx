@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from "@/app/components/ui/dialog";
 import type { Task, TaskPriority, TaskContext, EnergyLevel } from "@prisma/client";
-import { AlertCircle, Clock, Zap, Briefcase, ShoppingBag, Heart, Wallet, Home, Users, BookOpen, MoreHorizontal } from "lucide-react";
+import { AlertCircle, Clock, Zap, Briefcase, ShoppingBag, Heart, Wallet, Home, Users, BookOpen, MoreHorizontal, Loader2 } from "lucide-react";
 
 interface TaskFormProps {
   task?: Task | null;
@@ -71,6 +71,37 @@ export function TaskForm({ task, open, onOpenChange, onSuccess }: TaskFormProps)
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [estimating, setEstimating] = useState(false);
+  const [durationEstimate, setDurationEstimate] = useState<{ minutes: number; confidence: number; basedOn: string } | null>(null);
+
+  // Estimer automatiquement la durée quand le titre, contexte ou priorité change
+  useEffect(() => {
+    if (!task && title.trim() && context && priority) {
+      estimateDuration();
+    }
+  }, [title, context, priority, description]);
+
+  // Estimer la durée automatiquement
+  const estimateDuration = async () => {
+    if (!title.trim() || estimating) return;
+    
+    setEstimating(true);
+    try {
+      const response = await fetch(`/api/tasks/estimate-duration?title=${encodeURIComponent(title)}&context=${context}&priority=${priority}${description ? `&description=${encodeURIComponent(description)}` : ""}`);
+      if (response.ok) {
+        const data = await response.json();
+        setDurationEstimate(data);
+        // Auto-remplir si confiance > 0.6
+        if (data.confidence > 0.6 && !estimatedDuration) {
+          setEstimatedDuration(data.estimatedMinutes.toString());
+        }
+      }
+    } catch (err) {
+      // Ignorer les erreurs silencieusement
+    } finally {
+      setEstimating(false);
+    }
+  };
 
   // Réinitialiser le formulaire quand la tâche change
   useEffect(() => {
@@ -240,6 +271,9 @@ export function TaskForm({ task, open, onOpenChange, onSuccess }: TaskFormProps)
                 <Label htmlFor="estimatedDuration" className="flex items-center gap-2">
                   <Clock className="h-4 w-4" />
                   Durée (min)
+                  {estimating && (
+                    <Loader2 className="h-3 w-3 animate-spin text-[hsl(var(--muted-foreground))]" />
+                  )}
                 </Label>
                 <Input
                   id="estimatedDuration"
@@ -247,9 +281,15 @@ export function TaskForm({ task, open, onOpenChange, onSuccess }: TaskFormProps)
                   min="1"
                   value={estimatedDuration}
                   onChange={(e) => setEstimatedDuration(e.target.value)}
-                  placeholder="Ex: 30"
+                  placeholder={durationEstimate ? `${durationEstimate.minutes} min (suggéré)` : "Ex: 30"}
                   disabled={loading}
                 />
+                {durationEstimate && (
+                  <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                    💡 {durationEstimate.basedOn}
+                    {durationEstimate.confidence > 0.6 && " (confiance élevée)"}
+                  </p>
+                )}
               </div>
 
               <div className="grid gap-2">

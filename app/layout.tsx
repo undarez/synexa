@@ -5,6 +5,7 @@ import "leaflet/dist/leaflet.css";
 import { Providers } from "./providers";
 import { PWARegister } from "./components/PWARegister";
 import { LowerThird } from "./components/LowerThird";
+import { BrowserExtensionHandler } from "./components/BrowserExtensionHandler";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -57,6 +58,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <Providers>
+          <BrowserExtensionHandler />
           {children}
           <PWARegister />
           <LowerThird />

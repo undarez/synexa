@@ -200,3 +200,7 @@ Vous pouvez utiliser cette API dans vos routines Synexa pour :
 - [TomTom Traffic Flow API](https://developer.tomtom.com/traffic-api/documentation/product-information/introduction)
 - [TomTom Traffic Incidents API](https://developer.tomtom.com/traffic-api/documentation/product-information/introduction)
 
+
+
+
+

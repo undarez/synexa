@@ -1,8 +1,17 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Mail, Github, Twitter, Linkedin } from "lucide-react";
 
 export function Footer() {
-  const currentYear = new Date().getFullYear();
+  // Utiliser useState pour éviter les erreurs d'hydratation
+  // L'année est définie côté client après le montage
+  const [currentYear, setCurrentYear] = useState(2024);
+
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear());
+  }, []);
 
   return (
     <footer className="border-t border-[hsl(var(--border))] bg-[hsl(var(--background))]">

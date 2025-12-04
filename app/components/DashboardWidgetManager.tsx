@@ -26,12 +26,33 @@ import {
   MessageSquare,
   Wifi,
   Bot,
+  Shield,
+  Newspaper,
 } from "lucide-react";
 import { WidgetType, WidgetConfig, AVAILABLE_WIDGETS } from "@/app/lib/dashboard/widgets";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { EventsList } from "@/app/components/EventsList";
 import { TasksList } from "@/app/components/TasksList";
 import { RoutinesList } from "@/app/components/RoutinesList";
 import { NetworkDetector } from "@/app/components/NetworkDetector";
+import { NewsWidget } from "@/app/components/NewsWidget";
+import { SecurityWidget } from "@/app/components/SecurityWidget";
+import { EnergyWidget } from "@/app/components/EnergyWidget";
 import { VoiceCommandWrapper } from "@/app/components/VoiceCommandWrapper";
 import { DailyBrief } from "@/app/components/DailyBrief";
 import { ChatInterface } from "@/app/components/ChatInterface";
@@ -93,6 +114,13 @@ export function DashboardWidgetManager({
   const [editMode, setEditMode] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     fetchWidgets();
@@ -181,100 +209,205 @@ export function DashboardWidgetManager({
     }
   };
 
-  const renderWidget = (widget: WidgetConfig) => {
-    if (!widget.visible) return null;
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = widgets.findIndex((w) => w.widgetType === active.id);
+      const newIndex = widgets.findIndex((w) => w.widgetType === over.id);
+
+      const newWidgets = arrayMove(widgets, oldIndex, newIndex);
+      
+      // Mettre à jour les positions
+      const updatedWidgets = newWidgets.map((widget, index) => ({
+        ...widget,
+        position: index,
+      }));
+
+      setWidgets(updatedWidgets);
+
+      // Sauvegarder les nouvelles positions
+      try {
+        await fetch("/api/dashboard/widgets", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            widgets: updatedWidgets.map((w) => ({
+              widgetType: w.widgetType,
+              position: w.position,
+            })),
+          }),
+        });
+      } catch (error) {
+        console.error("Erreur lors de la sauvegarde de l'ordre:", error);
+        // Recharger en cas d'erreur
+        fetchWidgets();
+      }
+    }
+  };
+
+  const resizeWidget = async (widgetType: WidgetType, newSize: "small" | "medium" | "large") => {
+    const widget = widgets.find((w) => w.widgetType === widgetType);
+    if (!widget) return;
+
+    try {
+      await fetch("/api/dashboard/widgets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...widget,
+          size: newSize,
+        }),
+      });
+      fetchWidgets();
+    } catch (error) {
+      console.error("Erreur lors du redimensionnement:", error);
+    }
+  };
+
+  // Composant SortableWidget pour le drag & drop
+  function SortableWidget({ widget }: { widget: WidgetConfig }) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: widget.widgetType });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    };
 
     const sizeClasses = {
       small: "col-span-1",
-      medium: "col-span-1 md:col-span-2",
-      large: "col-span-1 md:col-span-2 lg:col-span-3",
+      medium: "col-span-1 lg:col-span-2", // Max 2 par ligne
+      large: "col-span-1 lg:col-span-2", // Max 2 par ligne même pour large
     };
 
-    const widgetProps = {
-      events: widget.widgetType === "events" ? events : undefined,
-      tasks: widget.widgetType === "tasks" ? tasks : undefined,
-      routines: widget.widgetType === "routines" ? routines : undefined,
-    };
+    if (!widget.visible) return null;
 
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={`relative ${sizeClasses[widget.size]} animate-in fade-in slide-in-from-bottom-4 duration-500`}
+      >
+        {/* Fond avec meilleur contraste en mode clair */}
+        <div className="relative rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] dark:bg-gradient-to-br dark:from-zinc-900/90 dark:via-purple-950/30 dark:to-violet-950/40 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300 p-6 hover:scale-[1.02]">
+          {/* Poignée de drag */}
+          {editMode && (
+            <div
+              {...attributes}
+              {...listeners}
+              className="absolute top-3 left-3 z-20 cursor-grab active:cursor-grabbing p-2 rounded-md bg-white/70 dark:bg-zinc-800/70 hover:bg-white/90 dark:hover:bg-zinc-700/90 transition-all shadow-sm"
+            >
+              <GripVertical className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+            </div>
+          )}
+
+          {/* Boutons d'édition */}
+          {editMode && (
+            <div className="absolute top-3 right-3 z-20 flex gap-2">
+              {/* Bouton de redimensionnement */}
+              <div className="flex items-center gap-1 bg-white/70 dark:bg-zinc-800/70 rounded-md p-1 shadow-sm">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={`h-6 w-6 ${widget.size === "small" ? "bg-[hsl(var(--primary))]/20" : ""}`}
+                  onClick={() => resizeWidget(widget.widgetType, "small")}
+                  title="Petit"
+                >
+                  <div className="h-2 w-2 bg-current rounded" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={`h-6 w-6 ${widget.size === "medium" ? "bg-[hsl(var(--primary))]/20" : ""}`}
+                  onClick={() => resizeWidget(widget.widgetType, "medium")}
+                  title="Moyen"
+                >
+                  <div className="h-2 w-4 bg-current rounded" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={`h-6 w-6 ${widget.size === "large" ? "bg-[hsl(var(--primary))]/20" : ""}`}
+                  onClick={() => resizeWidget(widget.widgetType, "large")}
+                  title="Grand"
+                >
+                  <div className="h-2 w-6 bg-current rounded" />
+                </Button>
+              </div>
+              <Button
+                variant="secondary"
+                size="icon"
+                className="h-8 w-8 bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
+                onClick={() => toggleWidgetVisibility(widget.widgetType)}
+              >
+                {widget.visible ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                variant="destructive"
+                size="icon"
+                className="h-8 w-8 bg-red-500/80 hover:bg-red-600/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
+                onClick={() => removeWidget(widget.widgetType)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+
+          {/* Contenu du widget */}
+          <div className={editMode ? "pt-10" : ""}>
+            {renderWidgetContent(widget)}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const renderWidgetContent = (widget: WidgetConfig) => {
     switch (widget.widgetType) {
       case "dailyBrief":
-        return (
-          <div key={widget.widgetType} className={sizeClasses[widget.size]}>
-            <DailyBrief />
-          </div>
-        );
+        return <DailyBrief />;
       case "events":
-        return (
-          <div key={widget.widgetType} className={sizeClasses[widget.size]}>
-            <EventsList events={events} />
-          </div>
-        );
+        return <EventsList events={events} />;
       case "tasks":
-        return (
-          <div key={widget.widgetType} className={sizeClasses[widget.size]}>
-            <TasksList tasks={tasks} />
-          </div>
-        );
+        return <TasksList tasks={tasks} />;
       case "weather":
-        return (
-          <div key={widget.widgetType} className={sizeClasses[widget.size]}>
-            <WeatherWidget />
-          </div>
-        );
+        return <WeatherWidget />;
       case "traffic":
-        return (
-          <div key={widget.widgetType} className={sizeClasses[widget.size]}>
-            <TrafficWidget />
-          </div>
-        );
+        return <TrafficWidget />;
       case "health":
-        return (
-          <div key={widget.widgetType} className={sizeClasses[widget.size]}>
-            <HealthWidget />
-          </div>
-        );
+        return <HealthWidget />;
       case "finance":
-        return (
-          <div key={widget.widgetType} className={sizeClasses[widget.size]}>
-            <FinanceWidget />
-          </div>
-        );
+        return <FinanceWidget />;
       case "routines":
-        return (
-          <div key={widget.widgetType} className={sizeClasses[widget.size]}>
-            <RoutinesList routines={routines} />
-          </div>
-        );
+        return <RoutinesList routines={routines} />;
       case "wellness":
-        return (
-          <div key={widget.widgetType} className={sizeClasses[widget.size]}>
-            <WellnessDashboard />
-          </div>
-        );
+        return <WellnessDashboard />;
       case "recommendations":
-        return (
-          <div key={widget.widgetType} className={sizeClasses[widget.size]}>
-            <PersonalizedRecommendations />
-          </div>
-        );
+        return <PersonalizedRecommendations />;
       case "voiceCommand":
-        return (
-          <div key={widget.widgetType} className={sizeClasses[widget.size]}>
-            <VoiceCommandWrapper />
-          </div>
-        );
+        return <VoiceCommandWrapper />;
       case "chatInterface":
-        return (
-          <div key={widget.widgetType} className={sizeClasses[widget.size]}>
-            <ChatInterface />
-          </div>
-        );
+        return <ChatInterface />;
       case "networkDetector":
-        return (
-          <div key={widget.widgetType} className={sizeClasses[widget.size]}>
-            <NetworkDetector />
-          </div>
-        );
+        return <NetworkDetector />;
+      case "news":
+        return <NewsWidget />;
+      case "security":
+        return <SecurityWidget />;
+      case "energy":
+        return <EnergyWidget />;
       default:
         return null;
     }
@@ -290,11 +423,11 @@ export function DashboardWidgetManager({
     <div className="space-y-6">
       {/* Suggestions de Synexa */}
       {showSuggestions && suggestions.length > 0 && (
-        <Card className="border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/20">
+        <Card className="border-blue-200 bg-blue-50/80 dark:border-blue-900 dark:bg-blue-950/20">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Bot className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                <Bot className="h-5 w-5 text-blue-700 dark:text-blue-400" />
                 <CardTitle className="text-blue-900 dark:text-blue-100">
                   Suggestions de Synexa
                 </CardTitle>
@@ -307,7 +440,7 @@ export function DashboardWidgetManager({
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <CardDescription className="text-blue-700 dark:text-blue-300">
+            <CardDescription className="text-blue-800 dark:text-blue-300">
               Je peux vous suggérer d'ajouter ces widgets pour améliorer votre dashboard
             </CardDescription>
           </CardHeader>
@@ -319,27 +452,27 @@ export function DashboardWidgetManager({
 
                 const Icon = iconMap[widgetDef.icon] || Sparkles;
                 const priorityColors = {
-                  high: "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400",
-                  medium: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400",
-                  low: "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400",
+                  high: "bg-red-100 text-red-900 dark:bg-red-900/20 dark:text-red-400",
+                  medium: "bg-yellow-100 text-yellow-900 dark:bg-yellow-900/20 dark:text-yellow-400",
+                  low: "bg-blue-100 text-blue-900 dark:bg-blue-900/20 dark:text-blue-400",
                 };
 
                 return (
                   <div
                     key={idx}
-                    className="flex items-start justify-between rounded-lg border border-blue-200 bg-white p-4 dark:border-blue-800 dark:bg-zinc-900"
+                    className="flex items-start justify-between rounded-lg border border-blue-300 bg-white dark:border-blue-800 dark:bg-zinc-900 p-4 shadow-sm"
                   >
                     <div className="flex items-start gap-3 flex-1">
-                      <Icon className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                      <Icon className="h-5 w-5 text-blue-700 dark:text-blue-400 mt-0.5" />
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-semibold text-sm">{widgetDef.name}</h4>
+                          <h4 className="font-semibold text-sm text-[hsl(var(--foreground))]">{widgetDef.name}</h4>
                           <Badge className={priorityColors[suggestion.priority]}>
                             {suggestion.priority === "high" ? "Prioritaire" :
                              suggestion.priority === "medium" ? "Recommandé" : "Optionnel"}
                           </Badge>
                         </div>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                        <p className="text-xs text-[hsl(var(--muted-foreground))]">
                           {suggestion.reason}
                         </p>
                       </div>
@@ -361,18 +494,25 @@ export function DashboardWidgetManager({
       )}
 
       {/* Bouton d'édition */}
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Button
+          variant={editMode ? "default" : "outline"}
+          onClick={() => setEditMode(!editMode)}
+        >
+          <Settings className="h-4 w-4 mr-2" />
+          {editMode ? "Terminer l'édition" : "Personnaliser le dashboard"}
+        </Button>
         <Dialog>
           <DialogTrigger asChild>
-            <Button variant="outline" onClick={() => setEditMode(true)}>
-              <Settings className="h-4 w-4 mr-2" />
-              Personnaliser le dashboard
+            <Button variant="outline">
+              <Plus className="h-4 w-4 mr-2" />
+              Ajouter un widget
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto bg-[hsl(var(--background))]">
             <DialogHeader>
-              <DialogTitle>Personnaliser votre dashboard</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-[hsl(var(--foreground))]">Personnaliser votre dashboard</DialogTitle>
+              <DialogDescription className="text-[hsl(var(--muted-foreground))]">
                 Activez ou désactivez les widgets selon vos préférences
               </DialogDescription>
             </DialogHeader>
@@ -384,12 +524,12 @@ export function DashboardWidgetManager({
                 return (
                   <div
                     key={widgetDef.id}
-                    className="flex items-center justify-between rounded-lg border p-4"
+                    className="flex items-center justify-between rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 hover:bg-[hsl(var(--muted))]/50 transition-colors"
                   >
                     <div className="flex items-center gap-3">
                       <Icon className="h-5 w-5 text-[hsl(var(--primary))]" />
                       <div>
-                        <h4 className="font-semibold">{widgetDef.name}</h4>
+                        <h4 className="font-semibold text-[hsl(var(--foreground))]">{widgetDef.name}</h4>
                         <p className="text-sm text-[hsl(var(--muted-foreground))]">
                           {widgetDef.description}
                         </p>
@@ -439,39 +579,24 @@ export function DashboardWidgetManager({
         </Dialog>
       </div>
 
-      {/* Grille de widgets */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {visibleWidgets.map((widget) => (
-          <div key={widget.widgetType} className="relative">
-            {editMode && (
-              <div className="absolute top-2 right-2 z-10 flex gap-2">
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => toggleWidgetVisibility(widget.widgetType)}
-                >
-                  {widget.visible ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => removeWidget(widget.widgetType)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-            {renderWidget(widget)}
+      {/* Grille de widgets avec drag & drop */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={visibleWidgets.map((w) => w.widgetType)}
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {visibleWidgets.map((widget) => (
+              <SortableWidget key={widget.widgetType} widget={widget} />
+            ))}
           </div>
-        ))}
-      </div>
+        </SortableContext>
+      </DndContext>
     </div>
   );
 }
+
 

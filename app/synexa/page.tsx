@@ -31,3 +31,7 @@ export default async function SynexaPage() {
   );
 }
 
+
+
+
+

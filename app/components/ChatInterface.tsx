@@ -37,6 +37,39 @@ export function ChatInterface({ className = "" }: ChatInterfaceProps) {
     scrollToBottom();
   }, [messages]);
 
+  // Charger une suggestion proactive de Synexa au démarrage (une seule fois)
+  useEffect(() => {
+    const loadProactiveSuggestion = async () => {
+      // Ne charger que si le chat est vide et qu'on n'a pas déjà chargé
+      if (messages.length === 0) {
+        try {
+          const response = await fetch("/api/synexa/proactive-suggestions");
+          if (response.ok) {
+            const data = await response.json();
+            const topSuggestion = data.suggestions?.[0];
+            
+            // Afficher seulement les suggestions haute priorité
+            if (topSuggestion && topSuggestion.priority === "high" && topSuggestion.confidence > 0.8) {
+              const proactiveMessage: Message = {
+                role: "assistant",
+                content: topSuggestion.message,
+                timestamp: new Date(),
+              };
+              setMessages([proactiveMessage]);
+            }
+          }
+        } catch (error) {
+          // Ignorer silencieusement les erreurs
+          console.error("[ChatInterface] Erreur chargement suggestion proactive:", error);
+        }
+      }
+    };
+
+    // Attendre un peu avant de charger pour que le composant soit monté
+    const timer = setTimeout(loadProactiveSuggestion, 1000);
+    return () => clearTimeout(timer);
+  }, []); // Seulement au montage
+
   const handleSend = async () => {
     if (!input.trim() || loading) return;
 
