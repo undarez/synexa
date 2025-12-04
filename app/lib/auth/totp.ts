@@ -3,8 +3,8 @@
  * Compatible avec Google Authenticator, Microsoft Authenticator, Authy, etc.
  */
 
-import speakeasy from "speakeasy";
-import QRCode from "qrcode";
+import * as speakeasy from "speakeasy";
+import * as QRCode from "qrcode";
 import { encrypt, decrypt } from "../encryption";
 
 /**

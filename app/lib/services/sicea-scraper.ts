@@ -1,10 +1,24 @@
 /**
  * Service de scraping sécurisé pour le portail SICEA
  * Récupère automatiquement les données de consommation électrique
+ * 
+ * NOTE: Puppeteer n'est pas disponible sur Vercel (serverless).
+ * Pour utiliser le scraping, il faut soit:
+ * - Utiliser un service externe (Browserless, ScrapingBee, etc.)
+ * - Utiliser une API SICEA si disponible
+ * - Exécuter le scraping sur un serveur dédié
  */
 
-import puppeteer, { Browser, Page } from "puppeteer";
 import { logger } from "../logger";
+
+// Puppeteer est optionnel (non disponible sur Vercel serverless)
+let puppeteer: any = null;
+try {
+  // Essayer d'importer puppeteer (peut échouer sur Vercel)
+  puppeteer = require("puppeteer");
+} catch (error) {
+  logger.warn("Puppeteer non disponible (normal sur Vercel serverless)");
+}
 
 export interface SiceaConsumptionData {
   date: string;
@@ -45,7 +59,16 @@ export async function scrapeSiceaConsumption(
   startDate: Date,
   endDate: Date
 ): Promise<SiceaScrapingResult> {
-  let browser: Browser | null = null;
+  // Vérifier si Puppeteer est disponible
+  if (!puppeteer) {
+    logger.warn("Scraping SICEA désactivé: Puppeteer non disponible (Vercel serverless)");
+    return {
+      success: false,
+      error: "Scraping non disponible sur cette plateforme. Utilisez un serveur dédié ou un service externe.",
+    };
+  }
+
+  let browser: any = null;
 
   try {
     logger.info("Démarrage scraping SICEA", {
@@ -223,7 +246,15 @@ export async function testSiceaConnection(
   username: string,
   password: string
 ): Promise<{ success: boolean; error?: string }> {
-  let browser: Browser | null = null;
+  // Vérifier si Puppeteer est disponible
+  if (!puppeteer) {
+    return {
+      success: false,
+      error: "Puppeteer non disponible (Vercel serverless)",
+    };
+  }
+
+  let browser: any = null;
 
   try {
     browser = await puppeteer.launch({
