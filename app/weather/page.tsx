@@ -356,7 +356,7 @@ export default function WeatherPage() {
               <CardContent>
                 <div className="grid gap-4 md:grid-cols-5">
                   {weather.forecast.map((day, index) => {
-                    const Icon = getWeatherIcon(day.description, day.temperature);
+                    const Icon = getWeatherIcon(day.description, day.temperature.max);
                     const date = new Date(day.date);
                     const isToday = index === 0;
 
@@ -374,11 +374,11 @@ export default function WeatherPage() {
                               : date.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" })}
                           </p>
                           <div className="mb-3 flex justify-center">
-                            <Icon className={`h-12 w-12 ${getWeatherColor(day.temperature)}`} />
+                            <Icon className={`h-12 w-12 ${getWeatherColor(day.temperature.max)}`} />
                           </div>
                           <p className="text-2xl font-bold text-[hsl(var(--foreground))] mb-1">
-                            <span className={getWeatherColor(day.temperature.max || day.temperature)}>
-                              {Math.round(day.temperature.max || day.temperature)}°
+                            <span className={getWeatherColor(day.temperature.max)}>
+                              {Math.round(day.temperature.max)}°
                             </span>
                             {day.temperature.min && (
                               <span className={`text-sm ml-1 ${getWeatherColor(day.temperature.min)}`}>
