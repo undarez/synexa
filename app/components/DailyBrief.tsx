@@ -290,7 +290,7 @@ export function DailyBrief() {
       )}
 
       {/* Suggestions */}
-      {(brief.suggestions?.traffic?.length || brief.suggestions?.tasks?.length || brief.suggestions?.routines?.length) > 0 && (
+      {((brief.suggestions?.traffic?.length ?? 0) + (brief.suggestions?.tasks?.length ?? 0) + (brief.suggestions?.routines?.length ?? 0)) > 0 && (
         <Card className="bg-white dark:bg-zinc-900/50 border-[hsl(var(--border))] shadow-sm hover:shadow-md transition-all duration-300">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-lg font-bold">
