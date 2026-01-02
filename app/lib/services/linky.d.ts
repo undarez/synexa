@@ -11,6 +11,8 @@ declare module '@bokub/linky' {
     timestamp?: string | number;
     value?: number;
     consumption?: number;
+    peakHours?: number;
+    offPeakHours?: number;
     unit?: string;
   }
 
