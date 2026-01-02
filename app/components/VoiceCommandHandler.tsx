@@ -243,6 +243,46 @@ export function VoiceCommandHandler({
     }
   };
 
+  const handleNewsQuestion = async (questionData: any) => {
+    try {
+      const query = questionData.question || questionData.query || "";
+
+      // Rechercher les actualités
+      const response = await fetch(`/api/news/search?q=${encodeURIComponent(query)}`);
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Erreur lors de la recherche d'actualités");
+      }
+
+      const data = await response.json();
+      
+      // Stocker les données d'actualités
+      setNewsData({
+        query,
+        articles: data.articles || [],
+      });
+      
+      const summary = data.articles && data.articles.length > 0
+        ? `J'ai trouvé ${data.articles.length} article${data.articles.length > 1 ? 's' : ''} sur "${query}".`
+        : `Aucun article trouvé pour "${query}".`;
+
+      setResult({
+        type: "success",
+        message: summary,
+      });
+
+      // Réponse vocale
+      await speakText(summary, {
+        lang: "fr-FR",
+        rate: 0.9,
+        pitch: 1.0,
+      });
+    } catch (error: any) {
+      throw error;
+    }
+  };
+
   const handleWeatherQuestion = async (questionData: any) => {
     try {
       // Demander la géolocalisation
