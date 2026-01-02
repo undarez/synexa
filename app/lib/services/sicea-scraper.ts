@@ -318,7 +318,7 @@ export async function scrapeSiceaConsumption(
 
     // Extraire les données de consommation avec Playwright
     // Playwright evaluate ne peut recevoir qu'un seul argument, donc on passe un objet
-    const consumptionData = await page.evaluate(({ start, end }) => {
+    const consumptionData = await page.evaluate(({ start, end }: { start: string; end: string }) => {
       const data: SiceaConsumptionData[] = [];
       const startDate = new Date(start);
       const endDate = new Date(end);
