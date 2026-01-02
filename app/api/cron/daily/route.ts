@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
             const scrapeResult = await scrapeSiceaConsumption(
               decrypted.username,
               decrypted.password,
+              decrypted.contractNumber || undefined,
               startDate,
               endDate
             );
