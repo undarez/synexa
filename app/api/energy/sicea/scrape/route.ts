@@ -13,6 +13,7 @@ import { logSecurityEvent, generateDeviceId } from "@/app/lib/security/protectio
 import { firewallMiddleware } from "@/app/lib/security/firewall";
 import { logger } from "@/app/lib/logger";
 import { subDays, format } from "date-fns";
+import { toJsonInput } from "@/app/lib/prisma/json";
 
 /**
  * POST - Déclenche le scraping SICEA
@@ -161,8 +162,8 @@ export async function POST(request: NextRequest) {
             data: {
               status: "success",
               completedAt: new Date(),
-              dataRetrieved: result.data,
-              metadata: result.metadata,
+              dataRetrieved: toJsonInput(result.data),
+              metadata: toJsonInput(result.metadata),
             },
           });
 
