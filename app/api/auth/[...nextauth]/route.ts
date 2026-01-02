@@ -101,80 +101,17 @@ export const authOptions: NextAuthOptions = {
       console.log("[NextAuth SignIn] Tentative de connexion:", { 
         userId: user?.id, 
         email: user?.email, 
+        name: user?.name,
         provider: account?.provider 
       });
       
-      // Si c'est un provider OAuth (Google, Facebook)
+      // Pour OAuth, on laisse toujours l'adapter Prisma créer/gérer l'utilisateur
+      // On ne fait que logger pour le débogage
       if (account?.provider === "google" || account?.provider === "facebook") {
-        try {
-          // Vérifie si un utilisateur existe déjà avec cet email
-          const existingUser = await prisma.user.findUnique({
-            where: { email: user.email || undefined },
-          });
-
-          // Si l'utilisateur existe mais n'a pas de compte OAuth lié, on lie le compte
-          if (existingUser && account) {
-            const existingAccount = await prisma.account.findUnique({
-              where: {
-                provider_providerAccountId: {
-                  provider: account.provider,
-                  providerAccountId: account.providerAccountId,
-                },
-              },
-            });
-
-            // Si le compte OAuth n'existe pas encore, on le crée et on le lie
-            if (!existingAccount) {
-              await prisma.account.create({
-                data: {
-                  userId: existingUser.id,
-                  type: account.type,
-                  provider: account.provider,
-                  providerAccountId: account.providerAccountId,
-                  refresh_token: account.refresh_token,
-                  access_token: account.access_token,
-                  expires_at: account.expires_at,
-                  token_type: account.token_type,
-                  scope: account.scope,
-                  id_token: account.id_token,
-                  session_state: account.session_state,
-                },
-              });
-              console.log("[NextAuth SignIn] Compte OAuth lié à l'utilisateur existant");
-            } else {
-              // Mettre à jour le compte existant avec les nouveaux tokens et scopes
-              await prisma.account.update({
-                where: {
-                  provider_providerAccountId: {
-                    provider: account.provider,
-                    providerAccountId: account.providerAccountId,
-                  },
-                },
-                data: {
-                  refresh_token: account.refresh_token || existingAccount.refresh_token,
-                  access_token: account.access_token,
-                  expires_at: account.expires_at,
-                  token_type: account.token_type,
-                  scope: account.scope || existingAccount.scope, // Mettre à jour les scopes
-                  id_token: account.id_token,
-                  session_state: account.session_state,
-                },
-              });
-              console.log("[NextAuth SignIn] Compte OAuth mis à jour");
-            }
-          } else if (!existingUser) {
-            // Si l'utilisateur n'existe pas, l'adapter Prisma le créera automatiquement
-            console.log("[NextAuth SignIn] Nouvel utilisateur OAuth, création par l'adapter");
-          }
-          
-          // Toujours autoriser la connexion OAuth
-          console.log("[NextAuth SignIn] Connexion OAuth autorisée");
-          return true;
-        } catch (error) {
-          console.error("[NextAuth SignIn] Erreur lors de la connexion OAuth:", error);
-          // En cas d'erreur, on autorise quand même la connexion (l'adapter gérera)
-          return true;
-        }
+        console.log("[NextAuth SignIn] Connexion OAuth détectée, autorisation de la connexion");
+        console.log("[NextAuth SignIn] L'adapter Prisma va créer/mettre à jour l'utilisateur automatiquement");
+        // Toujours autoriser - l'adapter Prisma gère la création/mise à jour
+        return true;
       }
       
       // Pour les autres cas (credentials, etc.), on laisse NextAuth gérer
@@ -239,6 +176,34 @@ export const authOptions: NextAuthOptions = {
         token.email = user.email;
         token.name = user.name;
         token.picture = user.image;
+        console.log("[NextAuth JWT] Utilisateur reçu:", { id: user.id, email: user.email });
+      }
+      
+      // Si c'est une connexion OAuth et qu'on n'a pas encore l'ID utilisateur, le récupérer depuis la DB
+      if (account && (!token.sub || !token.email)) {
+        try {
+          const accountRecord = await prisma.account.findUnique({
+            where: {
+              provider_providerAccountId: {
+                provider: account.provider,
+                providerAccountId: account.providerAccountId,
+              },
+            },
+            include: {
+              user: true,
+            },
+          });
+          
+          if (accountRecord?.user) {
+            token.sub = accountRecord.user.id;
+            token.email = accountRecord.user.email;
+            token.name = accountRecord.user.name;
+            token.picture = accountRecord.user.image;
+            console.log("[NextAuth JWT] Utilisateur récupéré depuis DB:", { id: accountRecord.user.id, email: accountRecord.user.email });
+          }
+        } catch (error) {
+          console.error("[NextAuth JWT] Erreur récupération utilisateur:", error);
+        }
       }
       
       // Si c'est une connexion OAuth, mettre à jour les informations
@@ -255,6 +220,26 @@ export const authOptions: NextAuthOptions = {
       // Ajouter l'ID utilisateur à la session
       if (session.user && token.sub) {
         session.user.id = token.sub;
+      }
+      
+      // Si on n'a pas l'ID utilisateur, essayer de le récupérer depuis la DB
+      if (session.user && !session.user.id && token.email) {
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { email: token.email as string },
+            select: { id: true, email: true, name: true, image: true },
+          });
+          
+          if (dbUser) {
+            session.user.id = dbUser.id;
+            session.user.email = dbUser.email || session.user.email;
+            session.user.name = dbUser.name || session.user.name;
+            session.user.image = dbUser.image || session.user.image;
+            console.log("[NextAuth Session] Utilisateur récupéré depuis DB pour session:", { id: dbUser.id, email: dbUser.email });
+          }
+        } catch (error) {
+          console.error("[NextAuth Session] Erreur récupération utilisateur:", error);
+        }
       }
       
       // Ajouter les informations du token à la session si nécessaire
