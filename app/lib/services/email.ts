@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Initialiser Resend uniquement si la clé API est disponible
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 interface EmailOptions {
   to: string;
@@ -15,8 +16,8 @@ interface EmailOptions {
  */
 export async function sendEmail({ to, subject, html, from }: EmailOptions): Promise<{ success: boolean; error?: string }> {
   try {
-    // Si pas de clé API, on simule en développement
-    if (!process.env.RESEND_API_KEY) {
+    // Si pas de clé API ou resend non initialisé, on simule en développement
+    if (!process.env.RESEND_API_KEY || !resend) {
       console.log(`[Email] Simulation - Envoi à ${to}`);
       console.log(`[Email] Sujet: ${subject}`);
       console.log(`[Email] HTML: ${html.substring(0, 200)}...`);
