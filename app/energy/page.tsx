@@ -1008,10 +1008,10 @@ export default function EnergyPage() {
                               border: "1px solid hsl(var(--border))",
                               borderRadius: "8px",
                             }}
-                            formatter={(value: any, name: string) => {
+                            formatter={(value: any, name?: string) => {
                               if (name === "consumption") return [`${value.toFixed(2)} kWh`, "Consommation actuelle"];
                               if (name === "previous") return [`${value.toFixed(2)} kWh`, "Période précédente"];
-                              return [value, name];
+                              return [value, name || ""];
                             }}
                           />
                           {showComparison && previousPeriodData.length > 0 && (
