@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
 
     // Trier par distance (plus proche en premier) puis par sévérité (high > medium > low)
     const severityOrder = { high: 3, medium: 2, low: 1 };
-    rawIncidents.sort((a, b) => {
+    rawIncidents.sort((a: { distance: number; severity: "low" | "medium" | "high" }, b: { distance: number; severity: "low" | "medium" | "high" }) => {
       // Priorité aux incidents proches (dans un rayon de 50km)
       const aIsNear = a.distance <= 50;
       const bIsNear = b.distance <= 50;
