@@ -325,7 +325,13 @@ export async function GET(request: NextRequest) {
       
       if (lastConsumption?.metadata) {
         try {
-          meterInfo = JSON.parse(lastConsumption.metadata);
+          // metadata est déjà un objet JSON, pas besoin de parser si c'est déjà un objet
+          if (typeof lastConsumption.metadata === 'string') {
+            meterInfo = JSON.parse(lastConsumption.metadata);
+          } else {
+            // Si c'est déjà un objet, l'utiliser directement
+            meterInfo = lastConsumption.metadata as any;
+          }
         } catch (e) {
           // Ignorer les erreurs de parsing
         }
