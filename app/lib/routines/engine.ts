@@ -114,8 +114,6 @@ async function executeStep(
                   workLat: true,
                   workLng: true,
                   homeAddress: true,
-                  homeLat: true,
-                  homeLng: true,
                 },
               });
 
