@@ -21,6 +21,7 @@ export interface DiscoveredDevice {
     ip?: string;
     mac?: string;
     bluetoothAddress?: string;
+    port?: number;
     signalStrength?: number;
     firmware?: string;
     manufacturer?: string;
