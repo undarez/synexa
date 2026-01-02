@@ -15,9 +15,13 @@ function SignInContent() {
   // Vérifier les providers disponibles
   useEffect(() => {
     const loadProviders = async () => {
-      const res = await getProviders();
-      setProviders(res);
-      console.log("[SignIn] Providers disponibles:", res);
+      try {
+        const res = await getProviders();
+        setProviders(res);
+        console.log("[SignIn] Providers disponibles:", res);
+      } catch (err) {
+        console.error("[SignIn] Erreur chargement providers:", err);
+      }
     };
     loadProviders();
   }, []);
@@ -26,29 +30,69 @@ function SignInContent() {
   useEffect(() => {
     if (status === "authenticated" && session) {
       console.log("[SignIn] Utilisateur déjà connecté, redirection vers /dashboard");
-      window.location.replace("/dashboard");
+      // Utiliser router.push au lieu de window.location pour une meilleure gestion
+      router.push("/dashboard");
     }
-  }, [status, session]);
+  }, [status, session, router]);
+  
+  // Vérifier périodiquement la session après OAuth (pour gérer les callbacks)
+  useEffect(() => {
+    if (status === "loading") {
+      // Vérifier la session toutes les 500ms pendant le chargement
+      const checkSession = setInterval(async () => {
+        try {
+          const sessionRes = await fetch("/api/auth/session", { cache: "no-store" });
+          const sessionData = await sessionRes.json();
+          if (sessionData?.user) {
+            console.log("[SignIn] Session détectée après OAuth, redirection");
+            router.push("/dashboard");
+            clearInterval(checkSession);
+          }
+        } catch (err) {
+          console.error("[SignIn] Erreur vérification session:", err);
+        }
+      }, 500);
+      
+      // Nettoyer après 10 secondes
+      setTimeout(() => clearInterval(checkSession), 10000);
+      
+      return () => clearInterval(checkSession);
+    }
+  }, [status, router]);
   
   // Normaliser le callbackUrl : extraire le chemin si c'est une URL absolue
-  const rawCallbackUrl = searchParams.get("callbackUrl") || "/dashboard";
-  let callbackUrl = rawCallbackUrl;
-  
-  // Si c'est une URL absolue, extraire le chemin
+  let callbackUrl = "/dashboard";
   try {
+    const rawCallbackUrl = searchParams?.get("callbackUrl") || "/dashboard";
+    callbackUrl = rawCallbackUrl;
+    
+    // Si c'est une URL absolue, extraire le chemin
     if (rawCallbackUrl.startsWith("http://") || rawCallbackUrl.startsWith("https://")) {
       const url = new URL(rawCallbackUrl);
       callbackUrl = url.pathname + url.search;
     }
+    
+    // S'assurer que ce n'est pas la page de connexion elle-même
+    if (callbackUrl.startsWith("/auth/signin")) {
+      callbackUrl = "/dashboard";
+    }
   } catch (e) {
     // Si l'URL n'est pas valide, utiliser le dashboard par défaut
+    console.error("[SignIn] Erreur parsing callbackUrl:", e);
     callbackUrl = "/dashboard";
   }
   
-  // S'assurer que ce n'est pas la page de connexion elle-même
-  if (callbackUrl.startsWith("/auth/signin")) {
-    callbackUrl = "/dashboard";
-  }
+  // Vérifier s'il y a une erreur dans l'URL
+  useEffect(() => {
+    const errorParam = searchParams?.get("error");
+    if (errorParam) {
+      if (errorParam === "Callback") {
+        setError("Erreur lors de la connexion OAuth. Vérifiez que NEXTAUTH_URL est correctement configuré sur Vercel (doit être https://synexa-xi.vercel.app).");
+      } else {
+        setError(`Erreur: ${errorParam}`);
+      }
+    }
+  }, [searchParams]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
