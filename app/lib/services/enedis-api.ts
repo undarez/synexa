@@ -189,7 +189,9 @@ export async function fetchEnedisDailyConsumption(
         // Convertir les données Linky au format EnedisDailyData
         if (data && Array.isArray(data)) {
           for (const item of data) {
-            const itemDate = new Date(item.date || item.day || item.timestamp);
+            const dateValue = item.date || item.day || item.timestamp;
+            if (!dateValue) continue; // Ignorer les items sans date
+            const itemDate = new Date(dateValue);
             if (itemDate >= startDate && itemDate <= endDate) {
               const consumption = item.value || item.consumption || 0;
               // Calculer le coût avec les tarifs réglementés français
