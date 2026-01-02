@@ -231,7 +231,7 @@ export function TomTomTrafficMap({
 
         // Nettoyer le timeout au démontage
         return () => {
-          clearTimeout(timeoutId);
+          clearTimeout(timeout);
           if (map) {
             map.remove();
           }
