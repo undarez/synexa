@@ -290,7 +290,7 @@ export function DailyBrief() {
       )}
 
       {/* Suggestions */}
-      {(brief.suggestions.traffic?.length || brief.suggestions.tasks?.length || brief.suggestions.routines?.length) > 0 && (
+      {(brief.suggestions?.traffic?.length || brief.suggestions?.tasks?.length || brief.suggestions?.routines?.length) > 0 && (
         <Card className="bg-white dark:bg-zinc-900/50 border-[hsl(var(--border))] shadow-sm hover:shadow-md transition-all duration-300">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-lg font-bold">
@@ -302,7 +302,7 @@ export function DailyBrief() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {brief.suggestions.traffic?.map((item, idx) => (
+              {brief.suggestions?.traffic?.map((item, idx) => (
                 <div
                   key={idx}
                   className="flex items-start gap-2 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 p-3 hover:bg-blue-100 dark:hover:bg-blue-950/30 transition-all duration-200"
@@ -316,7 +316,7 @@ export function DailyBrief() {
                   </div>
                 </div>
               ))}
-              {brief.suggestions.tasks?.map((item, idx) => (
+              {brief.suggestions?.tasks?.map((item, idx) => (
                 <div
                   key={idx}
                   className="flex items-start gap-2 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900 p-3 hover:bg-orange-100 dark:hover:bg-orange-950/30 transition-all duration-200"
@@ -325,7 +325,7 @@ export function DailyBrief() {
                   <p className="text-sm text-[hsl(var(--foreground))]">{item.suggestion}</p>
                 </div>
               ))}
-              {brief.suggestions.routines?.map((item, idx) => (
+              {brief.suggestions?.routines?.map((item, idx) => (
                 <div
                   key={idx}
                   className="flex items-start gap-2 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 p-3 hover:bg-green-100 dark:hover:bg-green-950/30 transition-all duration-200"
