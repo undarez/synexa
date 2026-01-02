@@ -39,7 +39,7 @@ export function LowerThird({ className = "" }: LowerThirdProps) {
   const largeAnimationRef = useRef<number | undefined>(undefined);
   const timeRef = useRef(0);
   const largeTimeRef = useRef(0);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // Obtenir le message pour la page actuelle
   const getPageMessage = () => {
