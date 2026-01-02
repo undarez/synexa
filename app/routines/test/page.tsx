@@ -441,7 +441,7 @@ export default function TestRoutinesPage() {
                                 )}
                               </div>
                             )}
-                            {stepResult.output && (
+                            {Boolean(stepResult.output) && (
                               <div className="mt-2">
                                 {renderOutput(stepResult.output, stepResult.actionType)}
                               </div>
