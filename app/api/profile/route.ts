@@ -163,8 +163,9 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
+  let user;
   try {
-    const user = await requireUser();
+    user = await requireUser();
     const body = await request.json();
 
     const updateData: {
