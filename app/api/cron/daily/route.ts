@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
               value: {
                 path: ["enabled"],
                 equals: true,
-              },
+              } as any,
             },
           },
         },
