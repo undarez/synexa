@@ -299,7 +299,7 @@ export function TaskForm({ task, open, onOpenChange, onSuccess }: TaskFormProps)
                 </Label>
                 <Select
                   value={energyLevel || ""}
-                  onValueChange={(value) => setEnergyLevel(value || null)}
+                  onValueChange={(value) => setEnergyLevel(value ? (value as EnergyLevel) : null)}
                   disabled={loading}
                 >
                   <SelectTrigger id="energyLevel">
