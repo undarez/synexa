@@ -35,7 +35,7 @@ export async function getHealthSyncConfig(
 
   if (!preference) return null;
 
-  return preference.value as HealthSyncConfig;
+  return preference.value as unknown as HealthSyncConfig;
 }
 
 /**
