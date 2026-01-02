@@ -6,6 +6,7 @@
 import prisma from "@/app/lib/prisma";
 import { HealthMetricType } from "@prisma/client";
 import { createHealthMetric } from "./metrics";
+import { toJsonInput } from "@/app/lib/prisma/json";
 
 export interface HealthSyncConfig {
   provider: "apple_health" | "fitbit" | "withings" | "google_fit";
@@ -55,10 +56,10 @@ export async function setHealthSyncConfig(
     create: {
       userId,
       key: `health_sync_${config.provider}`,
-      value: config,
+      value: toJsonInput(config),
     },
     update: {
-      value: config,
+      value: toJsonInput(config),
     },
   });
 }
