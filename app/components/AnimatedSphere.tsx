@@ -9,7 +9,7 @@ interface AnimatedSphereProps {
 
 export function AnimatedSphere({ className = "", size = 300 }: AnimatedSphereProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | undefined>(undefined);
   const [isMounted, setIsMounted] = useState(false);
 
   // Éviter l'erreur d'hydratation en ne rendant le canvas qu'après le montage
