@@ -191,7 +191,10 @@ export default function TestRoutinesPage() {
         routes: Array<{ name: string; duration: string; traffic: string; details: string; polyline?: Array<{ lat: number; lng: number }> }>;
         userLocation?: { lat: number; lng: number };
       };
-      const location = data.userLocation || trafficData.userLocation;
+      const rawLocation = (data.userLocation as { lat?: number; lng?: number } | undefined) || trafficData.userLocation;
+      const location = rawLocation && typeof rawLocation.lat === 'number' && typeof rawLocation.lng === 'number'
+        ? { lat: rawLocation.lat, lng: rawLocation.lng }
+        : undefined;
       
       return (
         <div className="space-y-3">
