@@ -188,13 +188,21 @@ export default function TestRoutinesPage() {
 
     if (actionType === "NOTIFICATION" && data.type === "traffic" && data.data) {
       const trafficData = data.data as { 
-        routes: Array<{ name: string; duration: string; traffic: string; details: string; polyline?: Array<{ lat: number; lng: number }> }>;
+        routes: Array<{ name: string; duration: string; traffic: string; details: string; distance?: string; polyline?: Array<{ lat: number; lng: number }> }>;
         userLocation?: { lat: number; lng: number };
       };
       const rawLocation = (data.userLocation as { lat?: number; lng?: number } | undefined) || trafficData.userLocation;
       const location = rawLocation && typeof rawLocation.lat === 'number' && typeof rawLocation.lng === 'number'
         ? { lat: rawLocation.lat, lng: rawLocation.lng }
         : undefined;
+      
+      // Mapper les routes pour correspondre au type TrafficRoute
+      const routes = (trafficData.routes || []).map(route => ({
+        name: route.name,
+        duration: route.duration,
+        distance: route.distance || '',
+        polyline: route.polyline,
+      }));
       
       return (
         <div className="space-y-3">
@@ -204,7 +212,7 @@ export default function TestRoutinesPage() {
           </div>
           
           {location && (
-            <TrafficMap userLocation={location} routes={trafficData.routes || []} />
+            <TrafficMap userLocation={location} routes={routes} />
           )}
           
           <div className="space-y-2">
