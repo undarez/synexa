@@ -110,7 +110,7 @@ export async function getSmartHomeData(userId: string) {
         const capabilities = getDeviceCapabilities(model);
         const status = device.params?.switch === "on" || 
                       device.params?.switches?.some((s: any) => s.switch === "on") ||
-                      device.params?.power > 0 
+                      (device.params?.power !== undefined && device.params.power > 0)
                       ? "on" : "off";
         
         return {
@@ -611,7 +611,7 @@ function getDemoData() {
   ];
 
   const devicesOn = devices.filter(
-    (d) => d.params?.switch === "on" || d.params?.power > 0
+    (d) => d.params?.switch === "on" || (d.params?.power !== undefined && d.params.power > 0)
   ).length;
   const devicesOff = devices.length - devicesOn;
 
@@ -653,7 +653,7 @@ function getDemoData() {
       const status =
         device.params?.switch === "on" ||
         device.params?.switches?.some((s: any) => s.switch === "on") ||
-        device.params?.power > 0
+        (device.params?.power !== undefined && device.params.power > 0)
           ? "on"
           : "off";
 
