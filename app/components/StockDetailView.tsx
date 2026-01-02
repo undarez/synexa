@@ -397,11 +397,13 @@ export function StockDetailView({
                         color: "hsl(var(--text))",
                       }}
                       labelStyle={{ color: "hsl(var(--text-secondary))", fontSize: "12px" }}
-                      formatter={(value: number) => [
-                        `${value.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })} ${quote.currency}`,
+                      formatter={(value: number | undefined) => [
+                        value !== undefined
+                          ? `${value.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })} ${quote.currency}`
+                          : `0.00 ${quote.currency}`,
                         "Prix",
                       ]}
                     />
