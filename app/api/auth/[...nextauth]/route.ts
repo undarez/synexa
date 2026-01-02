@@ -183,9 +183,12 @@ export const authOptions: NextAuthOptions = {
     },
     async redirect({ url, baseUrl }) {
       // Priorité : baseUrl (fourni par NextAuth) > NEXTAUTH_URL > localhost
-      let finalBaseUrl = baseUrl;
+      let finalBaseUrl: string = baseUrl || "";
       if (!finalBaseUrl) {
-        finalBaseUrl = process.env.NEXTAUTH_URL?.trim();
+        const nextAuthUrl = process.env.NEXTAUTH_URL?.trim();
+        if (nextAuthUrl) {
+          finalBaseUrl = nextAuthUrl;
+        }
       }
       if (!finalBaseUrl) {
         finalBaseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
