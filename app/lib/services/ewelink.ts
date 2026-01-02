@@ -108,10 +108,10 @@ export async function getSmartHomeData(userId: string) {
       devices: devices.map((device) => {
         const model = identifySonoffModel(device);
         const capabilities = getDeviceCapabilities(model);
-        const status = device.params?.switch === "on" || 
+        const isOn = device.params?.switch === "on" || 
                       device.params?.switches?.some((s: any) => s.switch === "on") ||
-                      (device.params?.power !== undefined && device.params.power > 0)
-                      ? "on" : "off";
+                      (device.params?.power !== undefined && device.params.power > 0);
+        const status = isOn ? "on" : "off";
         
         return {
           id: device.deviceid,
@@ -650,12 +650,11 @@ function getDemoData() {
     devices: devices.map((device) => {
       const model = identifySonoffModel(device);
       const capabilities = getDeviceCapabilities(model);
-      const status =
+      const isOn =
         device.params?.switch === "on" ||
         device.params?.switches?.some((s: any) => s.switch === "on") ||
-        (device.params?.power !== undefined && device.params.power > 0)
-          ? "on"
-          : "off";
+        (device.params?.power !== undefined && device.params.power > 0);
+      const status = isOn ? "on" : "off";
 
       return {
         id: device.deviceid,
