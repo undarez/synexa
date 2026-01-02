@@ -10,7 +10,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/app/components/ui/card";
-import type { Bill, BillCategory, BillStatus } from "@prisma/client";
+import type { Bill, BillCategory } from "@prisma/client";
+import { BillStatus } from "@prisma/client";
 import {
   Zap,
   Wifi,
