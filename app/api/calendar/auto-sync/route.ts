@@ -101,7 +101,11 @@ export async function POST(request: NextRequest) {
             } else {
               // Créer un nouvel événement
               await prisma.calendarEvent.create({
-                data: eventData,
+                data: {
+                  ...eventData,
+                  reminders: eventData.reminders ?? undefined,
+                  metadata: eventData.metadata ?? undefined,
+                },
               });
               synced++;
             }

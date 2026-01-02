@@ -337,7 +337,7 @@ export function convertGoogleEventToInternal(
           useDefault: googleEvent.reminders.useDefault || false,
           overrides: googleEvent.reminders.overrides || [],
         }
-      : null,
+      : undefined,
     metadata: {
       attendees: googleEvent.attendees || [],
       timeZone: googleEvent.start.timeZone || "Europe/Paris",
