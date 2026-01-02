@@ -427,14 +427,14 @@ export default function TestRoutinesPage() {
                                 ❌ {stepResult.error}
                               </p>
                             )}
-                            {stepResult.status === "skipped" && stepResult.output && (
+                            {stepResult.status === "skipped" && Boolean(stepResult.output) && (
                               <div className="mb-2 rounded border border-blue-200 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-950/20">
                                 <p className="text-sm text-blue-800 dark:text-blue-200">
-                                  ⚠️ {typeof stepResult.output === "object" && "info" in stepResult.output 
+                                  ⚠️ {typeof stepResult.output === "object" && stepResult.output != null && "info" in stepResult.output 
                                     ? (stepResult.output as { info: string }).info 
                                     : "Action ignorée"}
                                 </p>
-                                {typeof stepResult.output === "object" && "suggestion" in stepResult.output && (
+                                {typeof stepResult.output === "object" && stepResult.output != null && "suggestion" in stepResult.output && (
                                   <p className="mt-1 text-xs text-blue-600 dark:text-blue-300">
                                     💡 {(stepResult.output as { suggestion: string }).suggestion}
                                   </p>
