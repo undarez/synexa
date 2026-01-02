@@ -14,7 +14,7 @@ const baseAdapter = PrismaAdapter(prisma) as Adapter;
 export const customPrismaAdapter: Adapter = {
   ...baseAdapter,
   
-  async linkAccount(data) {
+  async linkAccount(data: any) {
     // Filtrer refresh_token_expires_in qui n'existe pas dans le schéma Prisma
     const { refresh_token_expires_in, ...accountData } = data;
     
