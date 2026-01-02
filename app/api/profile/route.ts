@@ -200,10 +200,10 @@ export async function PATCH(request: NextRequest) {
       updateData.workAddress = body.workAddress.trim() || null;
     }
     if (body.workLat !== undefined) {
-      updateData.workLat = body.workLat ? parseFloat(body.workLat) : null;
+      updateData.workLat = body.workLat ? parseFloat(body.workLat) : undefined;
     }
     if (body.workLng !== undefined) {
-      updateData.workLng = body.workLng ? parseFloat(body.workLng) : null;
+      updateData.workLng = body.workLng ? parseFloat(body.workLng) : undefined;
     }
     if (body.wifiEnabled !== undefined) {
       updateData.wifiEnabled = Boolean(body.wifiEnabled);
