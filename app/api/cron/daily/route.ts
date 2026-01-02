@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
       let remindersSent = 0;
       for (const reminder of pendingReminders) {
         try {
-          await sendReminderNotification(reminder);
+          await sendReminderNotification(reminder.id);
           await prisma.reminder.update({
             where: { id: reminder.id },
             data: {
