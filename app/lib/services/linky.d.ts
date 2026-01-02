@@ -6,8 +6,11 @@ declare module '@bokub/linky' {
   }
 
   export interface LinkyConsumptionData {
-    date: string;
-    value: number;
+    date?: string;
+    day?: string;
+    timestamp?: string | number;
+    value?: number;
+    consumption?: number;
     unit?: string;
   }
 
