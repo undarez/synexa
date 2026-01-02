@@ -473,7 +473,7 @@ export function generateEnergyOptimizations(
     optimizations.push({
       type: "eco",
       message: `🌱 Votre consommation est élevée (${avgDaily.toFixed(1)} kWh/jour). Réduire de 25% permettrait d'économiser ${co2Reduction} kg de CO₂ par mois.`,
-      savings: (avgDaily * 0.25 * 0.18).toFixed(2),
+      savings: parseFloat(((avgDaily * 0.25 * 0.18).toFixed(2))),
     });
   }
 
