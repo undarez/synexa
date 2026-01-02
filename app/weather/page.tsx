@@ -270,7 +270,10 @@ export default function WeatherPage() {
                   latitude={userLocation.lat}
                   longitude={userLocation.lng}
                   weather={weather ? {
-                    current: weather.current,
+                    current: {
+                      ...weather.current,
+                      date: new Date().toISOString(),
+                    },
                     forecast: weather.forecast,
                   } : undefined}
                 />
