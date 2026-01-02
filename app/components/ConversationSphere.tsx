@@ -12,7 +12,7 @@ export function ConversationSphere({
   className = "",
 }: ConversationSphereProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | undefined>(undefined);
   const dimensionsRef = useRef({ width: 200, height: 200 });
 
   useEffect(() => {
