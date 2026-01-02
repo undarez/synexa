@@ -506,7 +506,7 @@ export function generateEnergyOptimizations(
     optimizations.push({
       type: "eco",
       message: `❄️ Votre consommation augmente, probablement due au chauffage. Vérifiez l'isolation de votre logement et la température de consigne (19°C recommandé).`,
-      savings: (avgDaily * 0.1 * 0.18).toFixed(2),
+      savings: parseFloat(((avgDaily * 0.1 * 0.18).toFixed(2))),
     });
   }
 
