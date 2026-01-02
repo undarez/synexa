@@ -13,15 +13,16 @@ import prisma from "@/app/lib/prisma";
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { deviceId: string } }
+  { params }: { params: Promise<{ deviceId: string }> }
 ) {
   try {
     const user = await requireUser();
+    const { deviceId } = await params;
     const body = await request.json();
 
     // Vérifier que l'appareil appartient à l'utilisateur
     const device = await prisma.securityDevice.findUnique({
-      where: { id: params.deviceId },
+      where: { id: deviceId },
     });
 
     if (!device || device.userId !== user.id) {
@@ -35,23 +36,23 @@ export async function PATCH(
 
     if (body.status) {
       updatedDevice = await updateSecurityDeviceStatus(
-        params.deviceId,
+        deviceId,
         body.status
       );
     } else if (body.isArmed !== undefined) {
       updatedDevice = await toggleSecurityDeviceArm(
-        params.deviceId,
+        deviceId,
         body.isArmed
       );
     } else if (body.isEnabled !== undefined) {
       updatedDevice = await toggleSecurityDevice(
-        params.deviceId,
+        deviceId,
         body.isEnabled
       );
     } else {
       // Mise à jour générale
       updatedDevice = await prisma.securityDevice.update({
-        where: { id: params.deviceId },
+        where: { id: deviceId },
         data: body,
       });
     }
@@ -73,13 +74,14 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { deviceId: string } }
+  { params }: { params: Promise<{ deviceId: string }> }
 ) {
   try {
     const user = await requireUser();
+    const { deviceId } = await params;
 
     const device = await prisma.securityDevice.findUnique({
-      where: { id: params.deviceId },
+      where: { id: deviceId },
     });
 
     if (!device || device.userId !== user.id) {
@@ -90,7 +92,7 @@ export async function DELETE(
     }
 
     await prisma.securityDevice.delete({
-      where: { id: params.deviceId },
+      where: { id: deviceId },
     });
 
     return NextResponse.json({ success: true });
@@ -107,13 +109,14 @@ export async function DELETE(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { deviceId: string } }
+  { params }: { params: Promise<{ deviceId: string }> }
 ) {
   try {
     const user = await requireUser();
+    const { deviceId } = await params;
 
     const device = await prisma.securityDevice.findUnique({
-      where: { id: params.deviceId },
+      where: { id: deviceId },
     });
 
     if (!device || device.userId !== user.id) {
@@ -123,7 +126,7 @@ export async function POST(
       );
     }
 
-    const result = await testSecurityDeviceConnection(params.deviceId);
+    const result = await testSecurityDeviceConnection(deviceId);
 
     return NextResponse.json(result);
   } catch (error) {

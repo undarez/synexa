@@ -7,12 +7,12 @@ import prisma from "@/app/lib/prisma";
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     await requireAdmin();
 
-    const { userId } = params;
+    const { userId } = await params;
 
     // Supprimer l'utilisateur et toutes ses données associées
     await prisma.user.delete({

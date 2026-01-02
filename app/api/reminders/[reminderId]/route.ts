@@ -18,14 +18,15 @@ type ReminderUpdatePayload = {
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { reminderId: string } }
+  { params }: { params: Promise<{ reminderId: string }> }
 ) {
   try {
     const user = await requireUser();
+    const { reminderId } = await params;
     const body = (await request.json()) as ReminderUpdatePayload;
 
     const reminder = await prisma.reminder.findFirst({
-      where: { id: params.reminderId, userId: user.id },
+      where: { id: reminderId, userId: user.id },
     });
 
     if (!reminder) {
@@ -84,13 +85,14 @@ export async function PATCH(
  */
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { reminderId: string } }
+  { params }: { params: Promise<{ reminderId: string }> }
 ) {
   try {
     const user = await requireUser();
+    const { reminderId } = await params;
 
     const reminder = await prisma.reminder.findFirst({
-      where: { id: params.reminderId, userId: user.id },
+      where: { id: reminderId, userId: user.id },
     });
 
     if (!reminder) {
