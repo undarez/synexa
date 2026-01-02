@@ -118,6 +118,7 @@ export async function generateProactiveSuggestions(
     }
 
     // 3. Suggestions basées sur les patterns d'heures préférées
+    const patterns = await detectPatterns(userId);
     const preferredHoursPattern = patterns.find((p) => p.pattern === "preferred_hours");
     
     if (preferredHoursPattern) {
