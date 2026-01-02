@@ -11,7 +11,7 @@ export function GoogleCalendarSync() {
   const [needsReconnect, setNeedsReconnect] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<React.ReactNode | null>(null);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
