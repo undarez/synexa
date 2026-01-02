@@ -25,6 +25,8 @@ export interface DiscoveredDevice {
     signalStrength?: number;
     firmware?: string;
     manufacturer?: string;
+    connected?: boolean;
+    connectedAt?: string;
   };
 }
 
