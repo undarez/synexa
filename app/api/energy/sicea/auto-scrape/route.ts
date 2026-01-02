@@ -10,6 +10,7 @@ import { decryptSiceaData } from "@/app/lib/encryption/sicea-encryption";
 import { scrapeSiceaConsumption } from "@/app/lib/services/sicea-scraper";
 import { logger } from "@/app/lib/logger";
 import { subDays } from "date-fns";
+import { toJsonInput } from "@/app/lib/prisma/json";
 
 /**
  * POST - Scraping automatique pour tous les utilisateurs actifs
@@ -123,8 +124,8 @@ export async function POST(request: NextRequest) {
             data: {
               status: "success",
               completedAt: new Date(),
-              dataRetrieved: scrapeResult.data,
-              metadata: scrapeResult.metadata,
+              dataRetrieved: toJsonInput(scrapeResult.data),
+              metadata: scrapeResult.metadata ? toJsonInput(scrapeResult.metadata) : undefined,
             },
           });
 
