@@ -161,7 +161,7 @@ export function ReminderItem({ reminder, onDelete }: ReminderItemProps) {
               )}
               {(reminder as any).recurrenceEnd && (
                 <span className="flex items-center gap-1 text-zinc-400">
-                  <CalendarIcon className="h-3 w-3" />
+                  <Calendar className="h-3 w-3" />
                   Jusqu'au {format(new Date((reminder as any).recurrenceEnd), "PP", { locale: fr })}
                 </span>
               )}
