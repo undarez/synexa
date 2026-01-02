@@ -1,16 +1,24 @@
 "use client";
 
 import { signIn, useSession, getProviders } from "next-auth/react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { useState, useEffect, Suspense } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 
 function SignInContent() {
-  const searchParams = useSearchParams();
   const router = useRouter();
   const { data: session, status } = useSession();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [providers, setProviders] = useState<any>(null);
+  const [searchParams, setSearchParams] = useState<URLSearchParams | null>(null);
+  
+  // Utiliser window.location.search au lieu de useSearchParams pour éviter le blocage Suspense
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      setSearchParams(params);
+    }
+  }, []);
   
   // Vérifier les providers disponibles
   useEffect(() => {
@@ -64,7 +72,9 @@ function SignInContent() {
   let callbackUrl = "/dashboard";
   try {
     const rawCallbackUrl = searchParams?.get("callbackUrl") || "/dashboard";
-    callbackUrl = rawCallbackUrl;
+    if (rawCallbackUrl) {
+      callbackUrl = rawCallbackUrl;
+    }
     
     // Si c'est une URL absolue, extraire le chemin
     if (rawCallbackUrl.startsWith("http://") || rawCallbackUrl.startsWith("https://")) {
@@ -84,7 +94,8 @@ function SignInContent() {
   
   // Vérifier s'il y a une erreur dans l'URL
   useEffect(() => {
-    const errorParam = searchParams?.get("error");
+    if (!searchParams) return;
+    const errorParam = searchParams.get("error");
     if (errorParam) {
       if (errorParam === "Callback") {
         setError("Erreur lors de la connexion OAuth. Cela peut être dû à : 1) NEXTAUTH_URL non configuré sur Vercel (doit être https://synexa-xi.vercel.app sans slash final), 2) Redéploiement nécessaire après modification des variables d'environnement, 3) URI de callback non autorisé dans Google Console.");
@@ -97,6 +108,22 @@ function SignInContent() {
       }
     }
   }, [searchParams]);
+  
+  // Afficher un loader pendant le chargement initial
+  if (!searchParams) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
+        <div className="w-full max-w-md rounded-lg border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <h1 className="mb-6 text-2xl font-semibold text-black dark:text-zinc-50">
+            Connexion à Synexa
+          </h1>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            Chargement...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
@@ -292,21 +319,7 @@ function SignInContent() {
 }
 
 export default function SignInPage() {
-  return (
-    <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-        <div className="w-full max-w-md rounded-lg border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <h1 className="mb-6 text-2xl font-semibold text-black dark:text-zinc-50">
-            Connexion à Synexa
-          </h1>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Chargement...
-          </p>
-        </div>
-      </div>
-    }>
-      <SignInContent />
-    </Suspense>
-  );
+  // Plus besoin de Suspense puisque useSearchParams n'est plus utilisé
+  return <SignInContent />;
 }
 
