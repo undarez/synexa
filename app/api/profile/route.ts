@@ -6,8 +6,9 @@ import { encryptUserData, decryptUserData } from "@/app/lib/encryption-helpers";
 import { logger } from "@/app/lib/logger";
 
 export async function GET() {
+  let user;
   try {
-    const user = await requireUser();
+    user = await requireUser();
     
     // Essayer de récupérer avec les nouveaux champs, avec fallback si les colonnes n'existent pas
     let userProfile;
