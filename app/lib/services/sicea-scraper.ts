@@ -534,7 +534,7 @@ export async function scrapeSiceaConsumption(
       meterInfo: Object.keys(meterInfo).length > 0 ? meterInfo : undefined,
       metadata: {
         scrapedAt: new Date(),
-        period: { start: startDate, end: endDate },
+        period: { start, end },
         totalRecords: extractedData.length,
       },
     };
