@@ -69,7 +69,7 @@ export async function getSmartHomeData(userId: string) {
     const rooms = await getRooms(userId);
     
     // Calculer les statistiques
-    const devicesOn = devices.filter((d) => d.params?.switch === "on" || d.params?.power > 0).length;
+    const devicesOn = devices.filter((d) => d.params?.switch === "on" || (d.params?.power !== undefined && d.params.power > 0)).length;
     const devicesOff = devices.length - devicesOn;
     
     // Température moyenne (si capteurs disponibles)
