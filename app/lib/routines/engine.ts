@@ -127,8 +127,8 @@ async function executeStep(
                 destinationLng = userProfile.workLng;
               } else if (userProfile?.homeAddress) {
                 destination = userProfile.homeAddress;
-                destinationLat = userProfile.homeLat;
-                destinationLng = userProfile.homeLng;
+                destinationLat = null;
+                destinationLng = null;
               }
 
               // Appeler l'API de trafic
