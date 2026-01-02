@@ -12,7 +12,7 @@ declare module '@bokub/linky' {
   }
 
   export class Linky {
-    constructor(options: LinkyOptions);
+    constructor(tokenOrOptions: string | LinkyOptions);
     login(): Promise<void>;
     getDailyConsumption(startDate: Date, endDate: Date): Promise<LinkyConsumptionData[]>;
     getMonthlyConsumption(startDate: Date, endDate: Date): Promise<LinkyConsumptionData[]>;
