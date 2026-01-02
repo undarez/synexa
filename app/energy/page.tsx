@@ -86,6 +86,18 @@ interface ConsumptionStats {
   trend: number;
 }
 
+interface MeterInfo {
+  peakIndex?: number;
+  peakIndexDate?: string | null;
+  offPeakIndex?: number;
+  offPeakIndexDate?: string | null;
+  maxPower?: number;
+  maxPowerDate?: string | null;
+  subscribedPower?: number;
+  prm?: string;
+  meterNumber?: string;
+}
+
 export default function EnergyPage() {
   const { data: session, status } = useSession();
   const [loading, setLoading] = useState(true);
