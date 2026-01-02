@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSession } from "next-auth/react";
 import { redirect, useRouter, useSearchParams } from "next/navigation";
 import { Plus, Loader2, Bell } from "lucide-react";
@@ -21,7 +21,7 @@ import { ReminderStatus } from "@prisma/client";
 import type { Reminder } from "@prisma/client";
 import { Footer } from "@/app/components/Footer";
 
-export default function RemindersPage() {
+function RemindersContent() {
   const { data: session, status } = useSession();
   const searchParams = useSearchParams();
   const [reminders, setReminders] = useState<Reminder[]>([]);
@@ -225,4 +225,26 @@ export default function RemindersPage() {
   );
 }
 
+export default function RemindersPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen flex-col">
+        <Navigation />
+        <main className="flex-1 p-6">
+          <div className="mx-auto max-w-4xl">
+            <Card>
+              <CardHeader>
+                <CardTitle>Rappels</CardTitle>
+                <CardDescription>Chargement...</CardDescription>
+              </CardHeader>
+            </Card>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    }>
+      <RemindersContent />
+    </Suspense>
+  );
+}
 
