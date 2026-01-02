@@ -9,10 +9,12 @@ import bcrypt from "bcrypt";
 // Log pour déboguer la configuration Google
 const googleClientId = process.env.GOOGLE_CLIENT_ID?.replace(/^["']|["']$/g, '') || '';
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.replace(/^["']|["']$/g, '') || '';
+const nextAuthUrl = process.env.NEXTAUTH_URL?.trim() || '';
 console.log("[NextAuth Config] GOOGLE_CLIENT_ID:", googleClientId ? `✅ Configuré (${googleClientId.substring(0, 20)}...)` : "❌ Non configuré");
 console.log("[NextAuth Config] GOOGLE_CLIENT_SECRET:", googleClientSecret ? "✅ Configuré" : "❌ Non configuré");
-console.log("[NextAuth Config] NEXTAUTH_URL:", process.env.NEXTAUTH_URL);
+console.log("[NextAuth Config] NEXTAUTH_URL:", nextAuthUrl || "❌ Non configuré");
 console.log("[NextAuth Config] NEXTAUTH_SECRET:", process.env.NEXTAUTH_SECRET ? "✅ Configuré" : "❌ Non configuré");
+console.log("[NextAuth Config] NODE_ENV:", process.env.NODE_ENV);
 
 export const authOptions: NextAuthOptions = {
   adapter: customPrismaAdapter,
@@ -180,9 +182,22 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
     async redirect({ url, baseUrl }) {
-      const finalBaseUrl = baseUrl || process.env.NEXTAUTH_URL || "http://localhost:3000";
+      // Priorité : baseUrl (fourni par NextAuth) > NEXTAUTH_URL > localhost
+      let finalBaseUrl = baseUrl;
+      if (!finalBaseUrl) {
+        finalBaseUrl = process.env.NEXTAUTH_URL?.trim();
+      }
+      if (!finalBaseUrl) {
+        finalBaseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
+      }
+      // Enlever le slash final s'il existe
+      finalBaseUrl = finalBaseUrl.replace(/\/$/, '');
       
-      console.log("[NextAuth Redirect] URL reçue:", url, "BaseUrl:", finalBaseUrl);
+      console.log("[NextAuth Redirect] URL reçue:", url);
+      console.log("[NextAuth Redirect] BaseUrl (fourni):", baseUrl);
+      console.log("[NextAuth Redirect] NEXTAUTH_URL (env):", process.env.NEXTAUTH_URL);
+      console.log("[NextAuth Redirect] VERCEL_URL (env):", process.env.VERCEL_URL);
+      console.log("[NextAuth Redirect] BaseUrl final utilisé:", finalBaseUrl);
       
       // Extraire le chemin de l'URL
       let path = "/";

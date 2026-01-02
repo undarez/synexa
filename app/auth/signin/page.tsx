@@ -87,9 +87,13 @@ function SignInContent() {
     const errorParam = searchParams?.get("error");
     if (errorParam) {
       if (errorParam === "Callback") {
-        setError("Erreur lors de la connexion OAuth. Vérifiez que NEXTAUTH_URL est correctement configuré sur Vercel (doit être https://synexa-xi.vercel.app).");
+        setError("Erreur lors de la connexion OAuth. Cela peut être dû à : 1) NEXTAUTH_URL non configuré sur Vercel (doit être https://synexa-xi.vercel.app sans slash final), 2) Redéploiement nécessaire après modification des variables d'environnement, 3) URI de callback non autorisé dans Google Console.");
+      } else if (errorParam === "Configuration") {
+        setError("Erreur de configuration OAuth. Vérifiez que GOOGLE_CLIENT_ID et GOOGLE_CLIENT_SECRET sont correctement configurés.");
+      } else if (errorParam === "AccessDenied") {
+        setError("Accès refusé. Vous avez annulé la connexion ou les permissions ont été refusées.");
       } else {
-        setError(`Erreur: ${errorParam}`);
+        setError(`Erreur de connexion: ${errorParam}`);
       }
     }
   }, [searchParams]);
