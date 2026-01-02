@@ -4,7 +4,7 @@
  */
 
 import prisma from "@/app/lib/prisma";
-import { HealthMetricType } from "@prisma/client";
+import { HealthMetricType, Prisma } from "@prisma/client";
 import { createHealthMetric } from "./metrics";
 import { toJsonInput } from "@/app/lib/prisma/json";
 
@@ -56,10 +56,10 @@ export async function setHealthSyncConfig(
     create: {
       userId,
       key: `health_sync_${config.provider}`,
-      value: toJsonInput(config),
+      value: toJsonInput(config) ?? Prisma.JsonNull,
     },
     update: {
-      value: toJsonInput(config),
+      value: toJsonInput(config) ?? Prisma.JsonNull,
     },
   });
 }
