@@ -113,6 +113,7 @@ export async function POST(request: NextRequest) {
     scrapeSiceaConsumption(
       decrypted.username,
       decrypted.password,
+      decrypted.contractNumber || undefined,
       startDate,
       endDate
     )
