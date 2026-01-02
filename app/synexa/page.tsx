@@ -4,6 +4,8 @@ import { Navigation } from "@/app/components/Navigation";
 import { Footer } from "@/app/components/Footer";
 import SynexaChat from "@/app/components/SynexaChat";
 
+export const dynamic = 'force-dynamic';
+
 export default async function SynexaPage() {
   const user = await getCurrentUser();
 

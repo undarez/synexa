@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/app/lib/auth/session";
 import { startOfDay, endOfDay } from "date-fns";
 import prisma from "@/app/lib/prisma";
+
+export const dynamic = 'force-dynamic';
 import { Navigation } from "@/app/components/Navigation";
 import { EventsList } from "@/app/components/EventsList";
 import { TasksList } from "@/app/components/TasksList";

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Button } from "@/app/components/ui/button";
 import { Footer } from "@/app/components/Footer";
 import { HeroSection } from "@/app/components/HeroSection";
+
+export const dynamic = 'force-dynamic';
 import {
   Calendar,
   CheckSquare,
