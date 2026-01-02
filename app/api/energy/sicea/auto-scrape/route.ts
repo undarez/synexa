@@ -72,12 +72,13 @@ export async function POST(request: NextRequest) {
         });
 
         // Lancer le scraping
-        const scrapeResult = await scrapeSiceaConsumption(
-          decrypted.username,
-          decrypted.password,
-          startDate,
-          endDate
-        );
+            const scrapeResult = await scrapeSiceaConsumption(
+              decrypted.username,
+              decrypted.password,
+              decrypted.contractNumber || undefined,
+              startDate,
+              endDate
+            );
 
         if (scrapeResult.success && scrapeResult.data) {
           // Sauvegarder les données
