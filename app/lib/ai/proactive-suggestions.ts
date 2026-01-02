@@ -217,7 +217,6 @@ export async function generateProactiveSuggestions(
             userId,
             title: {
               contains: metadata.title,
-              mode: "insensitive",
             },
             createdAt: {
               gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 derniers jours
