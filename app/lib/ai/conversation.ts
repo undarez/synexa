@@ -146,7 +146,7 @@ export async function getUserContextForSynexa(userId: string): Promise<{
     const patterns = await detectPatterns(userId);
     const userHabits = patterns
       .slice(0, 5) // Limiter à 5 habitudes principales
-      .map(p => `${p.patternType} (${p.confidence > 0.7 ? 'fréquent' : 'occasionnel'})`);
+      .map(p => `${p.pattern} (${p.confidence > 0.7 ? 'fréquent' : 'occasionnel'})`);
 
     // Récupérer les activités récentes
     const recentActivities = await getRecentActivities(userId, 7); // 7 derniers jours
