@@ -24,8 +24,9 @@ type ReminderPayload = {
  * Crée un nouveau rappel
  */
 export async function POST(request: NextRequest) {
+  let user;
   try {
-    const user = await requireUser();
+    user = await requireUser();
     const body = (await request.json()) as ReminderPayload;
 
     if (!body.title) {
@@ -159,8 +160,9 @@ export async function POST(request: NextRequest) {
  * Liste les rappels de l'utilisateur
  */
 export async function GET(request: NextRequest) {
+  let user;
   try {
-    const user = await requireUser();
+    user = await requireUser();
     const params = request.nextUrl.searchParams;
 
     const where: any = { userId: user.id };
