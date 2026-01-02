@@ -224,7 +224,16 @@ export async function GET(request: NextRequest) {
                   });
                 }
 
-                consumptionData.push(...siceaResult.data);
+                // Mapper les données SICEA pour s'assurer que cost est toujours défini
+                consumptionData.push(
+                  ...siceaResult.data.map((item) => ({
+                    date: item.date,
+                    consumption: item.consumption,
+                    cost: item.cost ?? 0,
+                    peakHours: item.peakHours,
+                    offPeakHours: item.offPeakHours,
+                  }))
+                );
                 
                 // Mettre à jour lastScrapedAt
                 await prisma.siceaCredentials.update({
