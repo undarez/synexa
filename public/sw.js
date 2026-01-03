@@ -83,6 +83,12 @@ self.addEventListener("fetch", (event) => {
   try {
     const url = new URL(request.url);
 
+    // IGNORER COMPLÈTEMENT les routes NextAuth - ne pas les intercepter du tout
+    if (url.pathname.startsWith("/api/auth/")) {
+      console.log("[SW] Route NextAuth ignorée:", url.pathname);
+      return; // Ne pas intercepter, laisser passer directement
+    }
+
     // Vérifier AVANT d'intercepter si on doit ignorer cette requête
     if (shouldNeverCache(url)) {
       // Pour les routes critiques, forcer le rechargement depuis le réseau
@@ -219,6 +225,7 @@ self.addEventListener("notificationclick", (event) => {
       })
   );
 });
+
 
 
 

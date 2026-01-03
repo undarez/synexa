@@ -57,7 +57,39 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
   callbacks: {
-    async redirect({ baseUrl }) {
+    async signIn({ user, account, profile }) {
+      // Autoriser toutes les connexions
+      return true;
+    },
+    async jwt({ token, user, account }) {
+      if (user) {
+        token.sub = user.id;
+        token.email = user.email;
+        token.name = user.name;
+        token.picture = user.image;
+      }
+      if (account) {
+        token.accessToken = account.access_token;
+        token.refreshToken = account.refresh_token;
+        token.expiresAt = account.expires_at;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user && token.sub) {
+        session.user.id = token.sub;
+      }
+      return session;
+    },
+    async redirect({ url, baseUrl }) {
+      // Si l'URL est relative ou de la même origine, l'autoriser
+      if (url.startsWith("/")) {
+        return `${baseUrl}${url}`;
+      }
+      if (new URL(url).origin === baseUrl) {
+        return url;
+      }
+      // Sinon, rediriger vers le dashboard
       return `${baseUrl}/dashboard`;
     },
   },
