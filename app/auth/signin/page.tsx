@@ -46,10 +46,27 @@ function SignInContent() {
   // Vérifier périodiquement la session après OAuth (pour gérer les callbacks)
   useEffect(() => {
     if (status === "loading") {
+      // Vider le cache du Service Worker si disponible (pour éviter les problèmes de cache avec OAuth)
+      if (typeof window !== "undefined" && "serviceWorker" in navigator && "caches" in window) {
+        caches.keys().then((cacheNames) => {
+          cacheNames.forEach((cacheName) => {
+            caches.delete(cacheName).catch(() => {
+              // Ignorer les erreurs de suppression de cache
+            });
+          });
+        });
+      }
+
       // Vérifier la session toutes les 500ms pendant le chargement
       const checkSession = setInterval(async () => {
         try {
-          const sessionRes = await fetch("/api/auth/session", { cache: "no-store" });
+          const sessionRes = await fetch("/api/auth/session", { 
+            cache: "no-store",
+            headers: {
+              "Cache-Control": "no-cache, no-store, must-revalidate",
+              "Pragma": "no-cache",
+            },
+          });
           const sessionData = await sessionRes.json();
           if (sessionData?.user) {
             console.log("[SignIn] Session détectée après OAuth, redirection");
@@ -61,8 +78,8 @@ function SignInContent() {
         }
       }, 500);
       
-      // Nettoyer après 10 secondes
-      setTimeout(() => clearInterval(checkSession), 10000);
+      // Nettoyer après 20 secondes (augmenté pour laisser plus de temps)
+      setTimeout(() => clearInterval(checkSession), 20000);
       
       return () => clearInterval(checkSession);
     }

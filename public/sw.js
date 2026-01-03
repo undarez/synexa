@@ -46,6 +46,11 @@ self.addEventListener("fetch", (event) => {
       return;
     }
 
+    // Ne pas mettre en cache les routes d'authentification
+    if (url.pathname.startsWith("/auth/")) {
+      return;
+    }
+
     // Ne pas mettre en cache les requêtes avec des schémas non supportés
     // (chrome-extension:, data:, blob:, etc.)
     if (url.protocol !== "http:" && url.protocol !== "https:") {
