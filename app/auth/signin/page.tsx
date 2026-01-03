@@ -15,27 +15,58 @@ function SignInContent() {
 
   // Rediriger si déjà connecté
   useEffect(() => {
+    console.log("🔵 [CLIENT] Statut de session:", status);
     if (status === "authenticated") {
+      console.log("🔵 [CLIENT] Utilisateur authentifié, redirection vers /dashboard");
+      console.log("🔵 [CLIENT] Session:", session);
       router.push("/dashboard");
+    } else if (status === "unauthenticated") {
+      console.log("🔵 [CLIENT] Utilisateur non authentifié");
     }
-  }, [status, router]);
+  }, [status, router, session]);
 
   // Vérifier les erreurs dans l'URL (sans useSearchParams pour éviter Suspense)
   useEffect(() => {
     if (typeof window !== "undefined") {
+      console.log("🔵 [CLIENT] Vérification des paramètres URL");
+      console.log("🔵 [CLIENT] URL complète:", window.location.href);
       const params = new URLSearchParams(window.location.search);
       const errorParam = params.get("error");
+      const callbackUrl = params.get("callbackUrl");
+      
+      console.log("🔵 [CLIENT] Paramètres URL:", {
+        error: errorParam,
+        callbackUrl: callbackUrl,
+        allParams: Object.fromEntries(params.entries()),
+      });
+      
       if (errorParam === "Callback") {
+        console.error("🔵 [CLIENT] Erreur Callback détectée");
         setError("Erreur lors de la connexion. Vérifiez votre configuration OAuth.");
       } else if (errorParam === "AccessDenied") {
+        console.warn("🔵 [CLIENT] Accès refusé détecté");
         setError("Accès refusé. Vous avez annulé la connexion.");
+      } else if (errorParam) {
+        console.error("🔵 [CLIENT] Autre erreur détectée:", errorParam);
+        setError(`Erreur: ${errorParam}`);
       }
     }
   }, []);
 
   const handleGoogleSignIn = () => {
+    console.log("🔵 [CLIENT] Clic sur le bouton Google");
+    console.log("🔵 [CLIENT] URL actuelle:", window.location.href);
     setIsLoading(true);
-    signIn("google", { callbackUrl: "/dashboard" });
+    
+    signIn("google", { callbackUrl: "/dashboard" })
+      .then((result) => {
+        console.log("🔵 [CLIENT] Résultat signIn:", result);
+      })
+      .catch((error) => {
+        console.error("🔵 [CLIENT] Erreur signIn:", error);
+        setIsLoading(false);
+        setError("Erreur lors de la connexion Google");
+      });
   };
 
   const handleCredentialsSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
