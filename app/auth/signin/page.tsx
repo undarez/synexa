@@ -1,12 +1,11 @@
 "use client";
 
 import { signIn, useSession } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
 
-export default function SignInPage() {
+function SignInContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { data: session, status } = useSession();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,15 +17,18 @@ export default function SignInPage() {
     }
   }, [status, router]);
 
-  // Vérifier les erreurs dans l'URL
+  // Vérifier les erreurs dans l'URL (sans useSearchParams pour éviter Suspense)
   useEffect(() => {
-    const errorParam = searchParams?.get("error");
-    if (errorParam === "Callback") {
-      setError("Erreur lors de la connexion. Vérifiez votre configuration OAuth.");
-    } else if (errorParam === "AccessDenied") {
-      setError("Accès refusé. Vous avez annulé la connexion.");
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const errorParam = params.get("error");
+      if (errorParam === "Callback") {
+        setError("Erreur lors de la connexion. Vérifiez votre configuration OAuth.");
+      } else if (errorParam === "AccessDenied") {
+        setError("Accès refusé. Vous avez annulé la connexion.");
+      }
     }
-  }, [searchParams]);
+  }, []);
 
   const handleGoogleSignIn = () => {
     setIsLoading(true);
@@ -139,5 +141,19 @@ export default function SignInPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <p className="text-zinc-600 dark:text-zinc-400">Chargement...</p>
+        </div>
+      </div>
+    }>
+      <SignInContent />
+    </Suspense>
   );
 }
