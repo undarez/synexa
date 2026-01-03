@@ -182,6 +182,42 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 };
 
+// Ajouter des événements pour logger les erreurs
+authOptions.events = {
+  async signIn({ user, account, isNewUser }) {
+    console.log("📝 [NEXTAUTH] Event signIn:", {
+      userId: user?.id,
+      email: user?.email,
+      isNewUser,
+      provider: account?.provider,
+    });
+  },
+  async createUser({ user }) {
+    console.log("➕ [NEXTAUTH] Event createUser:", {
+      userId: user.id,
+      email: user.email,
+    });
+  },
+  async linkAccount({ user, account }) {
+    console.log("🔗 [NEXTAUTH] Event linkAccount:", {
+      userId: user.id,
+      provider: account.provider,
+    });
+  },
+  async session({ session, token }) {
+    console.log("📋 [NEXTAUTH] Event session:", {
+      userEmail: session.user?.email,
+      hasToken: !!token,
+    });
+  },
+  async signOut({ session, token }) {
+    console.log("🚪 [NEXTAUTH] Event signOut");
+  },
+};
+
+// Ajouter debug en développement
+authOptions.debug = process.env.NODE_ENV === "development";
+
 const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };
