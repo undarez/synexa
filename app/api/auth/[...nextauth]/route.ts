@@ -239,6 +239,17 @@ try {
   throw error;
 }
 
+/**
+ * Adapter la requête pour NextAuth
+ * NextAuth s'attend à req.query.nextauth qui n'existe pas en App Router
+ */
+function adaptRequestForNextAuth(req: Request, params: { nextauth: string[] }): any {
+  // Créer un objet qui simule la structure attendue par NextAuth
+  const adaptedReq = Object.create(req);
+  adaptedReq.query = { nextauth: params.nextauth };
+  return adaptedReq;
+}
+
 export async function GET(
   req: Request,
   context: { params: Promise<{ nextauth: string[] }> | { nextauth: string[] } }
@@ -276,9 +287,11 @@ export async function GET(
   }
   
   try {
-    // NextAuth v4 extrait automatiquement les paramètres de l'URL
-    // Pas besoin d'adapter la requête
-    const response = await handler(req);
+    // Adapter la requête pour NextAuth
+    const adaptedReq = adaptRequestForNextAuth(req, params);
+    console.log("📥 [NEXTAUTH] Requête adaptée avec query.nextauth:", adaptedReq.query);
+    
+    const response = await handler(adaptedReq);
     console.log("✅ [NEXTAUTH] GET response générée");
     console.log("✅ [NEXTAUTH] Status:", response.status);
     console.log("✅ [NEXTAUTH] Headers:", Object.fromEntries(response.headers.entries()));
@@ -334,8 +347,11 @@ export async function POST(
   }
   
   try {
-    // NextAuth v4 extrait automatiquement les paramètres de l'URL
-    const response = await handler(req);
+    // Adapter la requête pour NextAuth
+    const adaptedReq = adaptRequestForNextAuth(req, params);
+    console.log("📥 [NEXTAUTH] Requête adaptée avec query.nextauth:", adaptedReq.query);
+    
+    const response = await handler(adaptedReq);
     console.log("✅ [NEXTAUTH] POST response générée");
     console.log("✅ [NEXTAUTH] Status:", response.status);
     return response;
