@@ -95,6 +95,7 @@ export const authOptions: NextAuthOptions = {
   },
   pages: { signIn: "/auth/signin" },
   secret: process.env.NEXTAUTH_SECRET,
+  url: process.env.NEXTAUTH_URL, // IMPORTANT : NextAuth utilise cette URL pour générer les callbacks
   debug: process.env.NODE_ENV === "development",
   callbacks: {
     async signIn({ user, account }) {
@@ -119,25 +120,13 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
     async redirect({ url, baseUrl }) {
-      // Priorité : baseUrl (fourni par NextAuth) > NEXTAUTH_URL > localhost
-      let finalBaseUrl: string = baseUrl || "";
-      if (!finalBaseUrl) {
-        const nextAuthUrl = process.env.NEXTAUTH_URL?.trim();
-        if (nextAuthUrl) {
-          finalBaseUrl = nextAuthUrl;
-        }
-      }
-      if (!finalBaseUrl) {
-        finalBaseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
-      }
+      // NextAuth fournit baseUrl basé sur NEXTAUTH_URL - on l'utilise directement
       // Enlever le slash final s'il existe
-      finalBaseUrl = finalBaseUrl.replace(/\/$/, '');
+      const finalBaseUrl = baseUrl.replace(/\/$/, '');
       
       console.log("[NextAuth Redirect] URL reçue:", url);
-      console.log("[NextAuth Redirect] BaseUrl (fourni):", baseUrl);
+      console.log("[NextAuth Redirect] BaseUrl (NextAuth):", baseUrl);
       console.log("[NextAuth Redirect] NEXTAUTH_URL (env):", process.env.NEXTAUTH_URL);
-      console.log("[NextAuth Redirect] VERCEL_URL (env):", process.env.VERCEL_URL);
-      console.log("[NextAuth Redirect] BaseUrl final utilisé:", finalBaseUrl);
       
       // Extraire le chemin de l'URL
       let path = "/";
@@ -160,7 +149,7 @@ export const authOptions: NextAuthOptions = {
       
       // Si c'est la page de connexion, l'accueil, ou une route invalide, rediriger vers dashboard
       if (path === "/" || path.startsWith("/auth/") || path === "/signin" || !validRoutes.some(route => path.startsWith(route))) {
-        console.log("[NextAuth Redirect] Redirection vers /dashboard (route invalide ou page de connexion)");
+        console.log("[NextAuth Redirect] Redirection vers /dashboard");
         return `${finalBaseUrl}/dashboard`;
       }
       

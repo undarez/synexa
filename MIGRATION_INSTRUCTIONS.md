@@ -32,3 +32,4 @@ npm run migrate:favorites
 Après ces étapes, les favoris (articles et cotations) fonctionneront correctement !
 
 
+

@@ -22,3 +22,4 @@ Pour activer les fonctionnalités de favoris (articles et cotations), vous devez
 Les tables `FavoriteArticle` et `FavoriteStock` seront créées dans la base de données.
 
 
+
