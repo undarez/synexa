@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/app/lib/auth/admin";
 import prisma from "@/app/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 /**
  * GET - Récupère les logs de sécurité (admin uniquement)
@@ -25,14 +26,7 @@ export async function GET() {
     });
 
     return NextResponse.json({
-      logs: logs.map((log: {
-        id: string;
-        eventType: string;
-        severity: string;
-        details: string | null;
-        createdAt: Date;
-        userId: string | null;
-      }) => ({
+      logs: logs.map((log) => ({
         ...log,
         timestamp: log.createdAt,
       })),
