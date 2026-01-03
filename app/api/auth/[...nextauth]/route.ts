@@ -5,7 +5,6 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { customPrismaAdapter } from "@/app/lib/auth/prisma-adapter";
 import prisma from "@/app/lib/prisma";
 import bcrypt from "bcrypt";
-import { NextRequest } from "next/server";
 
 // ============================================
 // 🔍 LOGS DE CONFIGURATION DÉTAILLÉS
@@ -415,87 +414,8 @@ export const authOptions: NextAuthOptions = {
 };
 
 // ============================================
-// 🔍 HANDLER NEXTAUTH AVEC LOGS DÉTAILLÉS
+// 🔍 HANDLER NEXTAUTH
 // ============================================
 const handler = NextAuth(authOptions);
 
-export async function GET(request: NextRequest) {
-  const url = new URL(request.url);
-  console.log("=========================================");
-  console.log("🔍 [D-LOG] GET REQUEST - NEXTAUTH");
-  console.log("=========================================");
-  console.log("[D-LOG] URL complète:", request.url);
-  console.log("[D-LOG] Pathname:", url.pathname);
-  console.log("[D-LOG] Search params:", Object.fromEntries(url.searchParams.entries()));
-  
-  // Si c'est un callback OAuth, logger les paramètres importants
-  if (url.pathname.includes("/callback")) {
-    const code = url.searchParams.get("code");
-    const error = url.searchParams.get("error");
-    const state = url.searchParams.get("state");
-    console.log("[D-LOG] ⚠️ CALLBACK OAUTH DÉTECTÉ:");
-    console.log("[D-LOG]   - Code:", code ? "Présent" : "Absent");
-    console.log("[D-LOG]   - Error:", error || "Absent");
-    console.log("[D-LOG]   - State:", state || "Absent");
-  }
-  
-  try {
-    const response = await handler.GET(request as any);
-    
-    console.log("[D-LOG] ✅ GET Response status:", response.status);
-    
-    // Si c'est une redirection, logger la destination
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("location");
-      console.log("[D-LOG] ✅ Redirection vers:", location);
-    }
-    
-    // Si c'est un callback et qu'il y a une erreur, logger plus de détails
-    if (url.pathname.includes("/callback") && url.searchParams.get("error")) {
-      console.error("[D-LOG] ❌ ERREUR DANS CALLBACK:");
-      console.error("[D-LOG]   - Error:", url.searchParams.get("error"));
-      console.error("[D-LOG]   - Error description:", url.searchParams.get("error_description"));
-    }
-    
-    console.log("=========================================");
-    return response;
-  } catch (error) {
-    console.error("=========================================");
-    console.error("❌ [D-LOG] EXCEPTION DANS GET HANDLER");
-    console.error("=========================================");
-    console.error("[D-LOG] Erreur:", error);
-    if (error instanceof Error) {
-      console.error("[D-LOG] Message:", error.message);
-      console.error("[D-LOG] Stack:", error.stack);
-    }
-    console.error("=========================================");
-    throw error;
-  }
-}
-
-export async function POST(request: NextRequest) {
-  const url = new URL(request.url);
-  console.log("=========================================");
-  console.log("🔍 [D-LOG] POST REQUEST - NEXTAUTH");
-  console.log("=========================================");
-  console.log("[D-LOG] URL complète:", request.url);
-  console.log("[D-LOG] Pathname:", url.pathname);
-  
-  try {
-    const response = await handler.POST(request as any);
-    console.log("[D-LOG] ✅ POST Response status:", response.status);
-    console.log("=========================================");
-    return response;
-  } catch (error) {
-    console.error("=========================================");
-    console.error("❌ [D-LOG] EXCEPTION DANS POST HANDLER");
-    console.error("=========================================");
-    console.error("[D-LOG] Erreur:", error);
-    if (error instanceof Error) {
-      console.error("[D-LOG] Message:", error.message);
-      console.error("[D-LOG] Stack:", error.stack);
-    }
-    console.error("=========================================");
-    throw error;
-  }
-}
+export { handler as GET, handler as POST };
