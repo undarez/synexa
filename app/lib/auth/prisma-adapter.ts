@@ -247,7 +247,7 @@ export const customPrismaAdapter: Adapter = {
       console.log("✅ [D-LOG PRISMA] CREATESESSION SUCCÈS");
       console.log("=========================================");
       console.log("[D-LOG PRISMA] Session créée:", {
-        id: session.id,
+        sessionToken: session.sessionToken ? "Présent" : "Absent",
         userId: session.userId,
         expires: session.expires,
       });
@@ -283,7 +283,7 @@ export const customPrismaAdapter: Adapter = {
       if (result) {
         console.log("✅ [D-LOG PRISMA] GETSESSIONANDUSER TROUVÉ");
         console.log("[D-LOG PRISMA] Session:", {
-          id: result.session.id,
+          sessionToken: result.session.sessionToken ? "Présent" : "Absent",
           userId: result.session.userId,
           expires: result.session.expires,
         });
