@@ -77,12 +77,43 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 
   callbacks: {
-    async signIn({ user, account, profile }) {
-      console.log("🔐 [NEXTAUTH] Callback signIn déclenché");
+    async signIn({ user, account, profile, email, credentials }) {
+      console.log("🔐 [NEXTAUTH] ========== CALLBACK SIGNIN ==========");
       console.log("🔐 [NEXTAUTH] User:", user ? { id: user.id, email: user.email, name: user.name } : "null");
-      console.log("🔐 [NEXTAUTH] Account:", account ? { provider: account.provider, type: account.type } : "null");
-      console.log("🔐 [NEXTAUTH] Profile:", profile ? { email: profile.email, name: profile.name } : "null");
-      return true;
+      console.log("🔐 [NEXTAUTH] Account:", account ? { 
+        provider: account.provider, 
+        type: account.type,
+        providerAccountId: account.providerAccountId,
+        access_token: account.access_token ? "✅ Présent" : "❌ Manquant",
+        refresh_token: account.refresh_token ? "✅ Présent" : "❌ Manquant",
+        expires_at: account.expires_at,
+      } : "null");
+      console.log("🔐 [NEXTAUTH] Profile:", profile ? { 
+        email: profile.email, 
+        name: profile.name,
+        sub: profile.sub,
+      } : "null");
+      console.log("🔐 [NEXTAUTH] Email:", email);
+      console.log("🔐 [NEXTAUTH] Credentials:", credentials ? "✅ Présent" : "null");
+      
+      try {
+        // Vérifier que l'account est valide pour OAuth
+        if (account && account.provider === "google") {
+          console.log("🔐 [NEXTAUTH] Vérification du compte Google...");
+          if (!account.access_token) {
+            console.error("❌ [NEXTAUTH] ERREUR: Access token manquant pour Google");
+            return false;
+          }
+          console.log("✅ [NEXTAUTH] Compte Google valide");
+        }
+        
+        console.log("✅ [NEXTAUTH] SignIn autorisé");
+        return true;
+      } catch (error) {
+        console.error("❌ [NEXTAUTH] ERREUR dans signIn callback:", error);
+        console.error("❌ [NEXTAUTH] Stack:", error instanceof Error ? error.stack : "N/A");
+        return false;
+      }
     },
 
     async jwt({ token, user, account, trigger }) {
@@ -164,24 +195,36 @@ export const authOptions: NextAuthOptions = {
 
   events: {
     async signIn({ user, account, isNewUser }) {
-      console.log("📝 [NEXTAUTH] Event signIn déclenché");
+      console.log("📝 [NEXTAUTH] ========== EVENT SIGNIN ==========");
       console.log("📝 [NEXTAUTH] User:", user ? { id: user.id, email: user.email } : "null");
       console.log("📝 [NEXTAUTH] Account:", account ? { provider: account.provider } : "null");
       console.log("📝 [NEXTAUTH] Nouvel utilisateur:", isNewUser);
     },
     async createUser({ user }) {
-      console.log("➕ [NEXTAUTH] Event createUser déclenché");
+      console.log("➕ [NEXTAUTH] ========== EVENT CREATEUSER ==========");
       console.log("➕ [NEXTAUTH] Nouvel utilisateur créé:", { id: user.id, email: user.email, name: user.name });
     },
     async linkAccount({ user, account }) {
-      console.log("🔗 [NEXTAUTH] Event linkAccount déclenché");
+      console.log("🔗 [NEXTAUTH] ========== EVENT LINKACCOUNT ==========");
       console.log("🔗 [NEXTAUTH] Compte lié pour:", { userId: user.id, provider: account.provider });
+      console.log("🔗 [NEXTAUTH] Account details:", {
+        provider: account.provider,
+        type: account.type,
+        providerAccountId: account.providerAccountId,
+        access_token: account.access_token ? "✅ Présent" : "❌ Manquant",
+      });
     },
     async session({ session, token }) {
       console.log("📋 [NEXTAUTH] Event session déclenché");
       console.log("📋 [NEXTAUTH] Session:", session.user ? { email: session.user.email } : "null");
     },
+    async signOut({ session, token }) {
+      console.log("🚪 [NEXTAUTH] ========== EVENT SIGNOUT ==========");
+      console.log("🚪 [NEXTAUTH] Session:", session?.user ? { email: session.user.email } : "null");
+    },
   },
+  
+  debug: process.env.NODE_ENV === "development",
 };
 
 console.log("🚀 [NEXTAUTH] Création du handler NextAuth...");
@@ -197,17 +240,42 @@ try {
 }
 
 export async function GET(req: Request) {
-  console.log("📥 [NEXTAUTH] GET request reçue");
-  console.log("📥 [NEXTAUTH] URL:", req.url);
+  const url = new URL(req.url);
+  const pathname = url.pathname;
+  const searchParams = url.searchParams;
+  
+  console.log("📥 [NEXTAUTH] ========== GET REQUEST ==========");
+  console.log("📥 [NEXTAUTH] URL complète:", req.url);
+  console.log("📥 [NEXTAUTH] Pathname:", pathname);
+  console.log("📥 [NEXTAUTH] Search params:", Object.fromEntries(searchParams.entries()));
   console.log("📥 [NEXTAUTH] Method:", req.method);
+  
+  // Logs spécifiques pour le callback Google
+  if (pathname.includes("/callback/google")) {
+    console.log("🔄 [NEXTAUTH] ========== CALLBACK GOOGLE DÉTECTÉ ==========");
+    console.log("🔄 [NEXTAUTH] Code:", searchParams.get("code") ? "✅ Présent" : "❌ Manquant");
+    console.log("🔄 [NEXTAUTH] Error:", searchParams.get("error") || "Aucune");
+    console.log("🔄 [NEXTAUTH] State:", searchParams.get("state") ? "✅ Présent" : "❌ Manquant");
+    console.log("🔄 [NEXTAUTH] Scope:", searchParams.get("scope") || "N/A");
+  }
   
   try {
     const response = await handler(req);
-    console.log("✅ [NEXTAUTH] GET response générée avec succès");
+    console.log("✅ [NEXTAUTH] GET response générée");
     console.log("✅ [NEXTAUTH] Status:", response.status);
+    console.log("✅ [NEXTAUTH] Headers:", Object.fromEntries(response.headers.entries()));
+    
+    // Si c'est une redirection, logger la destination
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      console.log("↪️ [NEXTAUTH] Redirection vers:", location);
+    }
+    
     return response;
   } catch (error) {
-    console.error("❌ [NEXTAUTH] Erreur dans GET handler:", error);
+    console.error("❌ [NEXTAUTH] ========== ERREUR GET HANDLER ==========");
+    console.error("❌ [NEXTAUTH] Erreur:", error);
+    console.error("❌ [NEXTAUTH] Message:", error instanceof Error ? error.message : "Unknown error");
     console.error("❌ [NEXTAUTH] Stack:", error instanceof Error ? error.stack : "N/A");
     return new Response(
       JSON.stringify({ 
@@ -223,17 +291,23 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  console.log("📥 [NEXTAUTH] POST request reçue");
-  console.log("📥 [NEXTAUTH] URL:", req.url);
+  const url = new URL(req.url);
+  const pathname = url.pathname;
+  
+  console.log("📥 [NEXTAUTH] ========== POST REQUEST ==========");
+  console.log("📥 [NEXTAUTH] URL complète:", req.url);
+  console.log("📥 [NEXTAUTH] Pathname:", pathname);
   console.log("📥 [NEXTAUTH] Method:", req.method);
   
   try {
     const response = await handler(req);
-    console.log("✅ [NEXTAUTH] POST response générée avec succès");
+    console.log("✅ [NEXTAUTH] POST response générée");
     console.log("✅ [NEXTAUTH] Status:", response.status);
     return response;
   } catch (error) {
-    console.error("❌ [NEXTAUTH] Erreur dans POST handler:", error);
+    console.error("❌ [NEXTAUTH] ========== ERREUR POST HANDLER ==========");
+    console.error("❌ [NEXTAUTH] Erreur:", error);
+    console.error("❌ [NEXTAUTH] Message:", error instanceof Error ? error.message : "Unknown error");
     console.error("❌ [NEXTAUTH] Stack:", error instanceof Error ? error.stack : "N/A");
     return new Response(
       JSON.stringify({ 
