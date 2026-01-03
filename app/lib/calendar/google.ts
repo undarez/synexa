@@ -12,12 +12,23 @@ export type GoogleCalendarCredentials = {
 };
 
 function getRedirectUri() {
-  return (
-    process.env.GOOGLE_CALENDAR_REDIRECT_URI ??
-    `${
-      process.env.NEXTAUTH_URL ?? "http://localhost:3000"
-    }/api/auth/callback/google-calendar`
-  );
+  // Si GOOGLE_CALENDAR_REDIRECT_URI est défini, l'utiliser
+  // Sinon, construire l'URI par défaut basée sur NEXTAUTH_URL
+  const customUri = process.env.GOOGLE_CALENDAR_REDIRECT_URI;
+  if (customUri && customUri.trim() !== "") {
+    // Vérifier que ce n'est pas un scope (erreur commune)
+    if (customUri.startsWith("https://www.googleapis.com/auth/")) {
+      console.warn(
+        "[Google Calendar] ⚠️ GOOGLE_CALENDAR_REDIRECT_URI semble être un scope OAuth au lieu d'une URI de redirection. Utilisation de l'URI par défaut."
+      );
+    } else {
+      return customUri.trim();
+    }
+  }
+  
+  // URI par défaut : callback Google Calendar
+  const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+  return `${baseUrl.replace(/\/$/, "")}/api/auth/callback/google-calendar`;
 }
 
 export function createGoogleOAuthClient() {

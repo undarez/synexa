@@ -6,15 +6,26 @@ import { customPrismaAdapter } from "@/app/lib/auth/prisma-adapter";
 import prisma from "@/app/lib/prisma";
 import bcrypt from "bcrypt";
 
-// Log pour déboguer la configuration Google
+// ============================================
+// 🔍 LOGS DE CONFIGURATION DÉTAILLÉS
+// ============================================
 const googleClientId = process.env.GOOGLE_CLIENT_ID?.replace(/^["']|["']$/g, '') || '';
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.replace(/^["']|["']$/g, '') || '';
 const nextAuthUrl = process.env.NEXTAUTH_URL?.trim() || '';
-console.log("[NextAuth Config] GOOGLE_CLIENT_ID:", googleClientId ? `✅ Configuré (${googleClientId.substring(0, 20)}...)` : "❌ Non configuré");
-console.log("[NextAuth Config] GOOGLE_CLIENT_SECRET:", googleClientSecret ? "✅ Configuré" : "❌ Non configuré");
-console.log("[NextAuth Config] NEXTAUTH_URL:", nextAuthUrl || "❌ Non configuré");
-console.log("[NextAuth Config] NEXTAUTH_SECRET:", process.env.NEXTAUTH_SECRET ? "✅ Configuré" : "❌ Non configuré");
-console.log("[NextAuth Config] NODE_ENV:", process.env.NODE_ENV);
+
+console.log("=========================================");
+console.log("🔍 [D-LOG] CONFIGURATION NEXTAUTH");
+console.log("=========================================");
+console.log("[D-LOG] GOOGLE_CLIENT_ID:", googleClientId ? `✅ Configuré (${googleClientId.substring(0, 20)}...)` : "❌ Non configuré");
+console.log("[D-LOG] GOOGLE_CLIENT_SECRET:", googleClientSecret ? "✅ Configuré" : "❌ Non configuré");
+console.log("[D-LOG] NEXTAUTH_URL:", nextAuthUrl || "❌ Non configuré");
+console.log("[D-LOG] NEXTAUTH_URL (raw):", JSON.stringify(process.env.NEXTAUTH_URL));
+console.log("[D-LOG] NEXTAUTH_SECRET:", process.env.NEXTAUTH_SECRET ? "✅ Configuré" : "❌ Non configuré");
+console.log("[D-LOG] NODE_ENV:", process.env.NODE_ENV);
+console.log("[D-LOG] VERCEL:", process.env.VERCEL ? "✅ Oui" : "❌ Non");
+console.log("[D-LOG] VERCEL_URL:", process.env.VERCEL_URL || "Non défini");
+console.log("[D-LOG] VERCEL_ENV:", process.env.VERCEL_ENV || "Non défini");
+console.log("=========================================");
 
 export const authOptions: NextAuthOptions = {
   adapter: customPrismaAdapter,
@@ -36,7 +47,14 @@ export const authOptions: NextAuthOptions = {
           }),
         ]
       : (() => {
-          console.warn("[NextAuth Config] ⚠️ Google Provider non configuré - GOOGLE_CLIENT_ID ou GOOGLE_CLIENT_SECRET manquant");
+          console.error("=========================================");
+          console.error("❌ [D-LOG] GOOGLE PROVIDER NON CONFIGURÉ");
+          console.error("=========================================");
+          console.error("[D-LOG] GOOGLE_CLIENT_ID présent:", !!process.env.GOOGLE_CLIENT_ID);
+          console.error("[D-LOG] GOOGLE_CLIENT_SECRET présent:", !!process.env.GOOGLE_CLIENT_SECRET);
+          console.error("[D-LOG] GOOGLE_CLIENT_ID valeur:", process.env.GOOGLE_CLIENT_ID ? "Présent (masqué)" : "Absent");
+          console.error("[D-LOG] GOOGLE_CLIENT_SECRET valeur:", process.env.GOOGLE_CLIENT_SECRET ? "Présent (masqué)" : "Absent");
+          console.error("=========================================");
           return [];
         })()),
     // Facebook Provider - seulement si les clés sont configurées
@@ -98,66 +116,111 @@ export const authOptions: NextAuthOptions = {
   debug: process.env.NODE_ENV === "development",
   events: {
     async createUser({ user }) {
-      console.log("[NextAuth Event] USER CREATED:", {
+      console.log("=========================================");
+      console.log("🔍 [D-LOG] EVENT: USER CREATED");
+      console.log("=========================================");
+      console.log("[D-LOG] User créé:", {
         id: user.id,
         email: user.email,
         name: user.name,
-        image: user.image,
+        image: user.image ? "Présent" : "Absent",
       });
+      console.log("=========================================");
     },
     async signIn({ user, account, profile }) {
-      console.log("[NextAuth Event] SIGN IN:", {
+      console.log("=========================================");
+      console.log("🔍 [D-LOG] EVENT: SIGN IN");
+      console.log("=========================================");
+      console.log("[D-LOG] Connexion réussie:", {
         userId: user?.id,
         email: user?.email,
+        name: user?.name,
         provider: account?.provider,
         accountId: account?.providerAccountId,
+        accountType: account?.type,
+        hasAccessToken: !!account?.access_token,
+        hasRefreshToken: !!account?.refresh_token,
+        scope: account?.scope,
       });
+      console.log("[D-LOG] Profile:", profile ? "Présent" : "Absent");
+      console.log("=========================================");
     },
     async linkAccount({ user, account }) {
-      console.log("[NextAuth Event] ACCOUNT LINKED:", {
+      console.log("=========================================");
+      console.log("🔍 [D-LOG] EVENT: ACCOUNT LINKED");
+      console.log("=========================================");
+      console.log("[D-LOG] Compte lié:", {
         userId: user.id,
+        userEmail: user.email,
         provider: account.provider,
         accountId: account.providerAccountId,
+        accountType: account.type,
       });
+      console.log("=========================================");
     },
     async session({ session, token }) {
-      console.log("[NextAuth Event] SESSION CREATED:", {
+      console.log("=========================================");
+      console.log("🔍 [D-LOG] EVENT: SESSION CREATED");
+      console.log("=========================================");
+      console.log("[D-LOG] Session créée:", {
         userId: session.user?.id,
         email: session.user?.email,
+        name: session.user?.name,
         hasToken: !!token.sub,
+        tokenSub: token.sub,
       });
+      console.log("=========================================");
     },
   },
   callbacks: {
-    async signIn({ user, account }) {
-      console.log("[NextAuth SignIn] Tentative de connexion:", { 
-        userId: user?.id, 
-        email: user?.email, 
+    async signIn({ user, account, profile }) {
+      console.log("=========================================");
+      console.log("🔍 [D-LOG] CALLBACK SIGNIN");
+      console.log("=========================================");
+      console.log("[D-LOG] User:", {
+        id: user?.id,
+        email: user?.email,
         name: user?.name,
-        provider: account?.provider 
+        image: user?.image ? "Présent" : "Absent",
       });
+      console.log("[D-LOG] Account:", {
+        provider: account?.provider,
+        type: account?.type,
+        providerAccountId: account?.providerAccountId,
+        access_token: account?.access_token ? "Présent" : "Absent",
+        refresh_token: account?.refresh_token ? "Présent" : "Absent",
+        expires_at: account?.expires_at,
+        scope: account?.scope,
+      });
+      console.log("[D-LOG] Profile:", profile ? "Présent" : "Absent");
       
       // Pour OAuth, on laisse toujours l'adapter Prisma créer/gérer l'utilisateur
-      // On ne fait que logger pour le débogage
       if (account?.provider === "google" || account?.provider === "facebook") {
-        console.log("[NextAuth SignIn] Connexion OAuth détectée, autorisation de la connexion");
-        console.log("[NextAuth SignIn] L'adapter Prisma va créer/mettre à jour l'utilisateur automatiquement");
-        // Toujours autoriser - l'adapter Prisma gère la création/mise à jour
+        console.log("[D-LOG] ✅ Connexion OAuth détectée:", account.provider);
+        console.log("[D-LOG] ✅ Autorisation de la connexion");
+        console.log("[D-LOG] ✅ L'adapter Prisma va créer/mettre à jour l'utilisateur automatiquement");
+        console.log("=========================================");
         return true;
       }
       
       // Pour les autres cas (credentials, etc.), on laisse NextAuth gérer
-      console.log("[NextAuth SignIn] Connexion autorisée (credentials)");
+      console.log("[D-LOG] ✅ Connexion autorisée (credentials)");
+      console.log("=========================================");
       return true;
     },
     async redirect({ url, baseUrl }) {
+      console.log("=========================================");
+      console.log("🔍 [D-LOG] CALLBACK REDIRECT");
+      console.log("=========================================");
       // NextAuth fournit baseUrl basé sur NEXTAUTH_URL - on l'utilise directement
       // Enlever le slash final s'il existe
       const finalBaseUrl = baseUrl.replace(/\/$/, '');
       
-      console.log("[NextAuth Redirect] URL reçue:", url);
-      console.log("[NextAuth Redirect] BaseUrl (NextAuth):", baseUrl);
-      console.log("[NextAuth Redirect] NEXTAUTH_URL (env):", process.env.NEXTAUTH_URL);
+      console.log("[D-LOG] URL reçue:", url);
+      console.log("[D-LOG] BaseUrl (NextAuth):", baseUrl);
+      console.log("[D-LOG] BaseUrl (final, sans slash):", finalBaseUrl);
+      console.log("[D-LOG] NEXTAUTH_URL (env):", process.env.NEXTAUTH_URL);
+      console.log("[D-LOG] VERCEL_URL (env):", process.env.VERCEL_URL);
       
       // Extraire le chemin de l'URL
       let path = "/";
@@ -180,27 +243,44 @@ export const authOptions: NextAuthOptions = {
       
       // Si c'est la page de connexion, l'accueil, ou une route invalide, rediriger vers dashboard
       if (path === "/" || path.startsWith("/auth/") || path === "/signin" || !validRoutes.some(route => path.startsWith(route))) {
-        console.log("[NextAuth Redirect] Redirection vers /dashboard");
-        return `${finalBaseUrl}/dashboard`;
+        const redirectTo = `${finalBaseUrl}/dashboard`;
+        console.log("[D-LOG] ✅ Redirection vers /dashboard");
+        console.log("[D-LOG] URL finale:", redirectTo);
+        console.log("=========================================");
+        return redirectTo;
       }
       
       // Sinon, utiliser l'URL demandée
-      console.log("[NextAuth Redirect] Redirection vers:", path);
       const redirectUrl = url.startsWith("/") ? `${finalBaseUrl}${url}` : url;
+      console.log("[D-LOG] ✅ Redirection vers:", path);
+      console.log("[D-LOG] URL finale:", redirectUrl);
+      console.log("=========================================");
       return redirectUrl;
     },
     async jwt({ token, user, account }) {
+      console.log("=========================================");
+      console.log("🔍 [D-LOG] CALLBACK JWT");
+      console.log("=========================================");
+      console.log("[D-LOG] User présent:", !!user);
+      console.log("[D-LOG] Account présent:", !!account);
+      console.log("[D-LOG] Account provider:", account?.provider);
+      
       // Lors de la première connexion, stocker l'ID utilisateur dans le token
       if (user) {
         token.sub = user.id;
         token.email = user.email;
         token.name = user.name;
         token.picture = user.image;
-        console.log("[NextAuth JWT] Utilisateur reçu:", { id: user.id, email: user.email });
+        console.log("[D-LOG] ✅ Utilisateur reçu et ajouté au token:", { 
+          id: user.id, 
+          email: user.email,
+          name: user.name 
+        });
       }
       
       // Si c'est une connexion OAuth et qu'on n'a pas encore l'ID utilisateur, le récupérer depuis la DB
       if (account && (!token.sub || !token.email)) {
+        console.log("[D-LOG] 🔄 Récupération utilisateur depuis DB...");
         try {
           const accountRecord = await prisma.account.findUnique({
             where: {
@@ -219,10 +299,22 @@ export const authOptions: NextAuthOptions = {
             token.email = accountRecord.user.email;
             token.name = accountRecord.user.name;
             token.picture = accountRecord.user.image;
-            console.log("[NextAuth JWT] Utilisateur récupéré depuis DB:", { id: accountRecord.user.id, email: accountRecord.user.email });
+            console.log("[D-LOG] ✅ Utilisateur récupéré depuis DB:", { 
+              id: accountRecord.user.id, 
+              email: accountRecord.user.email 
+            });
+          } else {
+            console.log("[D-LOG] ⚠️ Aucun compte trouvé dans DB pour:", {
+              provider: account.provider,
+              providerAccountId: account.providerAccountId,
+            });
           }
         } catch (error) {
-          console.error("[NextAuth JWT] Erreur récupération utilisateur:", error);
+          console.error("[D-LOG] ❌ Erreur récupération utilisateur:", error);
+          if (error instanceof Error) {
+            console.error("[D-LOG] ❌ Message d'erreur:", error.message);
+            console.error("[D-LOG] ❌ Stack:", error.stack);
+          }
         }
       }
       
@@ -231,19 +323,48 @@ export const authOptions: NextAuthOptions = {
         token.accessToken = account.access_token;
         token.refreshToken = account.refresh_token;
         token.expiresAt = account.expires_at;
+        console.log("[D-LOG] ✅ Tokens OAuth ajoutés au JWT:", {
+          hasAccessToken: !!account.access_token,
+          hasRefreshToken: !!account.refresh_token,
+          expiresAt: account.expires_at,
+          scope: account.scope,
+        });
       }
       
-      console.log("[NextAuth JWT] Token mis à jour:", { sub: token.sub, email: token.email });
+      console.log("[D-LOG] ✅ Token JWT final:", { 
+        sub: token.sub, 
+        email: token.email,
+        hasAccessToken: !!token.accessToken,
+        hasRefreshToken: !!token.refreshToken,
+      });
+      console.log("=========================================");
       return token;
     },
     async session({ session, token }) {
+      console.log("=========================================");
+      console.log("🔍 [D-LOG] CALLBACK SESSION");
+      console.log("=========================================");
+      console.log("[D-LOG] Session initiale:", {
+        userId: session.user?.id,
+        email: session.user?.email,
+        name: session.user?.name,
+      });
+      console.log("[D-LOG] Token:", {
+        sub: token.sub,
+        email: token.email,
+        hasAccessToken: !!token.accessToken,
+        hasRefreshToken: !!token.refreshToken,
+      });
+      
       // Ajouter l'ID utilisateur à la session
       if (session.user && token.sub) {
         session.user.id = token.sub;
+        console.log("[D-LOG] ✅ ID utilisateur ajouté depuis token:", token.sub);
       }
       
       // Si on n'a pas l'ID utilisateur, essayer de le récupérer depuis la DB
       if (session.user && !session.user.id && token.email) {
+        console.log("[D-LOG] 🔄 Récupération utilisateur depuis DB (fallback)...");
         try {
           const dbUser = await prisma.user.findUnique({
             where: { email: token.email as string },
@@ -255,10 +376,18 @@ export const authOptions: NextAuthOptions = {
             session.user.email = dbUser.email || session.user.email;
             session.user.name = dbUser.name || session.user.name;
             session.user.image = dbUser.image || session.user.image;
-            console.log("[NextAuth Session] Utilisateur récupéré depuis DB pour session:", { id: dbUser.id, email: dbUser.email });
+            console.log("[D-LOG] ✅ Utilisateur récupéré depuis DB (fallback):", { 
+              id: dbUser.id, 
+              email: dbUser.email 
+            });
+          } else {
+            console.log("[D-LOG] ⚠️ Aucun utilisateur trouvé dans DB pour email:", token.email);
           }
         } catch (error) {
-          console.error("[NextAuth Session] Erreur récupération utilisateur:", error);
+          console.error("[D-LOG] ❌ Erreur récupération utilisateur (fallback):", error);
+          if (error instanceof Error) {
+            console.error("[D-LOG] ❌ Message d'erreur:", error.message);
+          }
         }
       }
       
@@ -273,7 +402,12 @@ export const authOptions: NextAuthOptions = {
         session.user.image = token.picture as string;
       }
       
-      console.log("[NextAuth Session] Session créée:", { userId: session.user.id, email: session.user.email });
+      console.log("[D-LOG] ✅ Session finale créée:", { 
+        userId: session.user.id, 
+        email: session.user.email,
+        name: session.user.name,
+      });
+      console.log("=========================================");
       return session;
     },
   },

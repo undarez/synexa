@@ -23,12 +23,31 @@ function SignInContent() {
   // Vérifier les providers disponibles
   useEffect(() => {
     const loadProviders = async () => {
+      console.log("=========================================");
+      console.log("🔍 [D-LOG CLIENT] CHARGEMENT PROVIDERS");
+      console.log("=========================================");
       try {
         const res = await getProviders();
         setProviders(res);
-        console.log("[SignIn] Providers disponibles:", res);
+        console.log("[D-LOG CLIENT] ✅ Providers disponibles:", res);
+        console.log("[D-LOG CLIENT] Google disponible:", !!res?.google);
+        console.log("[D-LOG CLIENT] Facebook disponible:", !!res?.facebook);
+        console.log("[D-LOG CLIENT] Credentials disponible:", !!res?.credentials);
+        if (!res?.google) {
+          console.error("[D-LOG CLIENT] ❌ Google provider non disponible !");
+          console.error("[D-LOG CLIENT] ❌ Vérifiez GOOGLE_CLIENT_ID et GOOGLE_CLIENT_SECRET");
+        }
+        console.log("=========================================");
       } catch (err) {
-        console.error("[SignIn] Erreur chargement providers:", err);
+        console.error("=========================================");
+        console.error("❌ [D-LOG CLIENT] ERREUR CHARGEMENT PROVIDERS");
+        console.error("=========================================");
+        console.error("[D-LOG CLIENT] Erreur:", err);
+        if (err instanceof Error) {
+          console.error("[D-LOG CLIENT] Message:", err.message);
+          console.error("[D-LOG CLIENT] Stack:", err.stack);
+        }
+        console.error("=========================================");
       }
     };
     loadProviders();
@@ -113,7 +132,19 @@ function SignInContent() {
   useEffect(() => {
     if (!searchParams) return;
     const errorParam = searchParams.get("error");
+    const errorDescription = searchParams.get("error_description");
+    const errorUri = searchParams.get("error_uri");
+    
     if (errorParam) {
+      console.log("=========================================");
+      console.log("❌ [D-LOG CLIENT] ERREUR DÉTECTÉE DANS URL");
+      console.log("=========================================");
+      console.log("[D-LOG CLIENT] Error:", errorParam);
+      console.log("[D-LOG CLIENT] Error Description:", errorDescription || "Non fourni");
+      console.log("[D-LOG CLIENT] Error URI:", errorUri || "Non fourni");
+      console.log("[D-LOG CLIENT] URL complète:", window.location.href);
+      console.log("=========================================");
+      
       if (errorParam === "Callback") {
         setError("Erreur lors de la connexion OAuth. Cela peut être dû à : 1) NEXTAUTH_URL non configuré sur Vercel (doit être https://synexa-xi.vercel.app sans slash final), 2) Redéploiement nécessaire après modification des variables d'environnement, 3) URI de callback non autorisé dans Google Console.");
       } else if (errorParam === "Configuration") {
@@ -121,7 +152,7 @@ function SignInContent() {
       } else if (errorParam === "AccessDenied") {
         setError("Accès refusé. Vous avez annulé la connexion ou les permissions ont été refusées.");
       } else {
-        setError(`Erreur de connexion: ${errorParam}`);
+        setError(`Erreur de connexion: ${errorParam}${errorDescription ? ` - ${errorDescription}` : ''}`);
       }
     }
   }, [searchParams]);
@@ -155,7 +186,14 @@ function SignInContent() {
           {providers?.google ? (
             <button
               onClick={() => {
-                console.log("[SignIn] Clic sur Google OAuth");
+                console.log("=========================================");
+                console.log("🔍 [D-LOG CLIENT] CLIC SUR GOOGLE OAUTH");
+                console.log("=========================================");
+                console.log("[D-LOG CLIENT] Callback URL:", "/dashboard");
+                console.log("[D-LOG CLIENT] Window location:", window.location.href);
+                console.log("[D-LOG CLIENT] NEXTAUTH_URL (si disponible):", process.env.NEXT_PUBLIC_NEXTAUTH_URL || "Non défini");
+                console.log("[D-LOG CLIENT] Appel signIn('google')...");
+                console.log("=========================================");
                 signIn("google", { callbackUrl: "/dashboard" });
               }}
               className="flex h-12 w-full items-center justify-center gap-3 rounded-lg border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-700"
