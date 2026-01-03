@@ -14,12 +14,84 @@ const baseAdapter = PrismaAdapter(prisma) as Adapter;
 export const customPrismaAdapter: Adapter = {
   ...baseAdapter,
   
+  async createUser(data) {
+    console.log("[PrismaAdapter] createUser appelé avec:", {
+      email: data.email,
+      name: data.name,
+      image: data.image,
+    });
+    
+    try {
+      const user = await baseAdapter.createUser(data);
+      console.log("[PrismaAdapter] createUser SUCCÈS:", {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      });
+      return user;
+    } catch (error: any) {
+      console.error("[PrismaAdapter] createUser ERREUR:", {
+        message: error.message,
+        code: error.code,
+        meta: error.meta,
+        email: data.email,
+      });
+      throw error;
+    }
+  },
+  
+  async getUser(id) {
+    console.log("[PrismaAdapter] getUser appelé avec id:", id);
+    try {
+      const user = await baseAdapter.getUser(id);
+      console.log("[PrismaAdapter] getUser résultat:", user ? { id: user.id, email: user.email } : "null");
+      return user;
+    } catch (error: any) {
+      console.error("[PrismaAdapter] getUser ERREUR:", error.message);
+      throw error;
+    }
+  },
+  
+  async getUserByEmail(email) {
+    console.log("[PrismaAdapter] getUserByEmail appelé avec email:", email);
+    try {
+      const user = await baseAdapter.getUserByEmail(email);
+      console.log("[PrismaAdapter] getUserByEmail résultat:", user ? { id: user.id, email: user.email } : "null");
+      return user;
+    } catch (error: any) {
+      console.error("[PrismaAdapter] getUserByEmail ERREUR:", error.message);
+      throw error;
+    }
+  },
+  
   async linkAccount(data: any) {
+    console.log("[PrismaAdapter] linkAccount appelé:", {
+      userId: data.userId,
+      provider: data.provider,
+      providerAccountId: data.providerAccountId,
+    });
+    
     // Filtrer refresh_token_expires_in qui n'existe pas dans le schéma Prisma
     const { refresh_token_expires_in, ...accountData } = data;
     
-    // Appeler la méthode linkAccount de l'adaptateur de base avec les données filtrées
-    return baseAdapter.linkAccount(accountData as any);
+    try {
+      const account = await baseAdapter.linkAccount(accountData as any);
+      console.log("[PrismaAdapter] linkAccount SUCCÈS:", {
+        id: account.id,
+        userId: account.userId,
+        provider: account.provider,
+      });
+      return account;
+    } catch (error: any) {
+      console.error("[PrismaAdapter] linkAccount ERREUR:", {
+        message: error.message,
+        code: error.code,
+        meta: error.meta,
+        userId: data.userId,
+        provider: data.provider,
+      });
+      throw error;
+    }
   },
 };
 

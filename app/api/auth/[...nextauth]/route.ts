@@ -96,6 +96,38 @@ export const authOptions: NextAuthOptions = {
   pages: { signIn: "/auth/signin" },
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === "development",
+  events: {
+    async createUser({ user }) {
+      console.log("[NextAuth Event] USER CREATED:", {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        image: user.image,
+      });
+    },
+    async signIn({ user, account, profile }) {
+      console.log("[NextAuth Event] SIGN IN:", {
+        userId: user?.id,
+        email: user?.email,
+        provider: account?.provider,
+        accountId: account?.providerAccountId,
+      });
+    },
+    async linkAccount({ user, account }) {
+      console.log("[NextAuth Event] ACCOUNT LINKED:", {
+        userId: user.id,
+        provider: account.provider,
+        accountId: account.providerAccountId,
+      });
+    },
+    async session({ session, token }) {
+      console.log("[NextAuth Event] SESSION CREATED:", {
+        userId: session.user?.id,
+        email: session.user?.email,
+        hasToken: !!token.sub,
+      });
+    },
+  },
   callbacks: {
     async signIn({ user, account }) {
       console.log("[NextAuth SignIn] Tentative de connexion:", { 
