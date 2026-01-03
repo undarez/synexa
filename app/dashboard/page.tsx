@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/app/lib/auth/session";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { startOfDay, endOfDay } from "date-fns";
 import prisma from "@/app/lib/prisma";
 
@@ -94,14 +95,14 @@ async function getDashboardData(userId: string) {
 }
 
 export default async function Dashboard() {
-  const user = await getCurrentUser();
+  const session = await getServerSession(authOptions);
 
-  if (!user) {
-    redirect("/?error=auth_required&redirect=/dashboard");
+  if (!session?.user?.id) {
+    redirect("/auth/signin");
   }
 
-  const brief = await getDashboardData(user.id);
-  const displayName = await getUserDisplayName(user.id);
+  const brief = await getDashboardData(session.user.id);
+  const displayName = await getUserDisplayName(session.user.id);
   const currentDate = new Date();
   const formattedDate = currentDate.toLocaleDateString("fr-FR", {
     weekday: "long",
