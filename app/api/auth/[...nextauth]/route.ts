@@ -311,6 +311,21 @@ export async function GET(
     const adaptedReq = adaptRequestForNextAuth(req, params);
     const response = await handler(adaptedReq);
     
+    // Vérifier que la réponse est valide
+    if (!response || !(response instanceof Response)) {
+      console.error("❌ [NEXTAUTH] La réponse n'est pas une Response valide:", response);
+      return new Response(
+        JSON.stringify({ 
+          error: "Internal Server Error",
+          message: "Invalid response from NextAuth handler"
+        }),
+        { 
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+    }
+    
     console.log("✅ [NEXTAUTH] GET response:", response.status);
     return response;
   } catch (error) {
@@ -341,6 +356,21 @@ export async function POST(
     
     const adaptedReq = adaptRequestForNextAuth(req, params);
     const response = await handler(adaptedReq);
+    
+    // Vérifier que la réponse est valide
+    if (!response || !(response instanceof Response)) {
+      console.error("❌ [NEXTAUTH] La réponse n'est pas une Response valide:", response);
+      return new Response(
+        JSON.stringify({ 
+          error: "Internal Server Error",
+          message: "Invalid response from NextAuth handler"
+        }),
+        { 
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+    }
     
     console.log("✅ [NEXTAUTH] POST response:", response.status);
     return response;
