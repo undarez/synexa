@@ -71,3 +71,4 @@
 - **Cookies** : Vérifier que les noms de cookies dans `hasSessionCookies()` correspondent à ceux de NextAuth
 
 
+
