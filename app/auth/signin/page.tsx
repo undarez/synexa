@@ -1,19 +1,31 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import AuthButtons from "@/app/components/auth/AuthButtons";
 
 export default function SignInPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
+    console.log("🔵 [SIGNIN] Statut de session:", status);
+    console.log("🔵 [SIGNIN] Session:", session);
+    
     if (status === "authenticated") {
-      router.push("/dashboard");
+      console.log("🔵 [SIGNIN] Utilisateur authentifié, redirection vers /dashboard");
+      // Utiliser replace au lieu de push pour éviter l'historique de navigation
+      router.replace("/dashboard");
+    } else if (status === "unauthenticated") {
+      // Vérifier s'il y a une erreur dans l'URL
+      const error = searchParams.get("error");
+      if (error) {
+        console.error("🔵 [SIGNIN] Erreur détectée:", error);
+      }
     }
-  }, [status, router]);
+  }, [status, session, router, searchParams]);
 
   if (status === "loading") {
     return (

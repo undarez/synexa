@@ -58,10 +58,21 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async signIn({ user, account, profile }) {
-      // Autoriser toutes les connexions
+      console.log("🔐 [NEXTAUTH] signIn callback:", {
+        userId: user?.id,
+        email: user?.email,
+        provider: account?.provider,
+      });
       return true;
     },
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, trigger }) {
+      console.log("🎫 [NEXTAUTH] jwt callback:", {
+        trigger,
+        hasUser: !!user,
+        hasAccount: !!account,
+        tokenSub: token.sub,
+      });
+      
       if (user) {
         token.sub = user.id;
         token.email = user.email;
@@ -76,20 +87,47 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
+      console.log("👤 [NEXTAUTH] session callback:", {
+        hasToken: !!token,
+        tokenSub: token.sub,
+        sessionUser: session.user?.email,
+      });
+      
       if (session.user && token.sub) {
         session.user.id = token.sub;
       }
       return session;
     },
     async redirect({ url, baseUrl }) {
-      // Si l'URL est relative ou de la même origine, l'autoriser
+      console.log("↪️ [NEXTAUTH] redirect callback:", { url, baseUrl });
+      
+      // Toujours rediriger vers /dashboard après authentification réussie
+      // Ignorer l'URL demandée pour éviter les boucles
+      if (url.includes("/auth/signin") || url.includes("/api/auth")) {
+        console.log("↪️ [NEXTAUTH] Redirection vers /dashboard (éviter boucle)");
+        return `${baseUrl}/dashboard`;
+      }
+      
+      // Si l'URL est relative, l'autoriser
       if (url.startsWith("/")) {
-        return `${baseUrl}${url}`;
+        const finalUrl = `${baseUrl}${url}`;
+        console.log("↪️ [NEXTAUTH] Redirection relative:", finalUrl);
+        return finalUrl;
       }
-      if (new URL(url).origin === baseUrl) {
-        return url;
+      
+      // Si l'URL est de la même origine, l'autoriser
+      try {
+        const urlObj = new URL(url);
+        if (urlObj.origin === baseUrl) {
+          console.log("↪️ [NEXTAUTH] Redirection même origine:", url);
+          return url;
+        }
+      } catch (e) {
+        // URL invalide, rediriger vers dashboard
       }
-      // Sinon, rediriger vers le dashboard
+      
+      // Par défaut, rediriger vers le dashboard
+      console.log("↪️ [NEXTAUTH] Redirection par défaut vers /dashboard");
       return `${baseUrl}/dashboard`;
     },
   },

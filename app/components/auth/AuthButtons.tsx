@@ -9,8 +9,15 @@ export default function AuthButtons() {
   const [password, setPassword] = useState("");
 
   const handleGoogleSignIn = () => {
+    console.log("🔵 [AUTHBUTTONS] Clic sur Google Sign In");
     setIsLoading(true);
-    signIn("google", { callbackUrl: "/dashboard" });
+    signIn("google", { 
+      callbackUrl: "/dashboard",
+      redirect: true,
+    }).catch((error) => {
+      console.error("🔵 [AUTHBUTTONS] Erreur lors de la connexion Google:", error);
+      setIsLoading(false);
+    });
   };
 
   const handleFacebookSignIn = () => {
