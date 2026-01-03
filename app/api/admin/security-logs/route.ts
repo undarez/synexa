@@ -26,7 +26,14 @@ export async function GET() {
     });
 
     return NextResponse.json({
-      logs: logs.map((log) => ({
+      logs: logs.map((log: {
+        id: string;
+        eventType: string;
+        severity: string;
+        details: Prisma.JsonValue;
+        createdAt: Date;
+        userId: string | null;
+      }) => ({
         ...log,
         timestamp: log.createdAt,
       })),
