@@ -7,7 +7,9 @@ import prisma from "@/app/lib/prisma";
 import bcrypt from "bcrypt";
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  // DÉSACTIVER PrismaAdapter temporairement pour tester
+  // Si ça fonctionne sans adapter, le problème vient de Prisma/DB
+  // adapter: PrismaAdapter(prisma),
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -87,17 +89,80 @@ export const authOptions: NextAuthOptions = {
     },
   },
   callbacks: {
-    async jwt({ token, user, account }) {
+    async signIn({ user, account, profile }) {
+      console.log("🔐 [NEXTAUTH] signIn callback:", {
+        userId: user?.id,
+        email: user?.email,
+        provider: account?.provider,
+        hasAccessToken: !!account?.access_token,
+      });
+      
+      // Autoriser toutes les connexions OAuth
+      if (account?.provider === "google" || account?.provider === "facebook") {
+        // Essayer de créer/lier l'utilisateur dans Prisma manuellement
+        try {
+          if (user?.email) {
+            const existingUser = await prisma.user.findUnique({
+              where: { email: user.email },
+            });
+            
+            if (!existingUser) {
+              // Créer l'utilisateur
+              const newUser = await prisma.user.create({
+                data: {
+                  email: user.email,
+                  name: user.name,
+                  image: user.image,
+                },
+              });
+              console.log("✅ [NEXTAUTH] Utilisateur créé:", newUser.id);
+              
+              // Créer le compte OAuth
+              if (account) {
+                await prisma.account.create({
+                  data: {
+                    userId: newUser.id,
+                    type: account.type,
+                    provider: account.provider,
+                    providerAccountId: account.providerAccountId,
+                    access_token: account.access_token,
+                    refresh_token: account.refresh_token,
+                    expires_at: account.expires_at,
+                    token_type: account.token_type,
+                    scope: account.scope,
+                    id_token: account.id_token,
+                    session_state: account.session_state,
+                  },
+                });
+                console.log("✅ [NEXTAUTH] Compte OAuth créé");
+              }
+            } else {
+              console.log("✅ [NEXTAUTH] Utilisateur existant trouvé:", existingUser.id);
+            }
+          }
+        } catch (error) {
+          console.error("❌ [NEXTAUTH] Erreur lors de la création de l'utilisateur:", error);
+          // Continuer quand même - la session JWT fonctionnera sans DB
+        }
+        
+        return true;
+      }
+      return true;
+    },
+    async jwt({ token, user, account, trigger }) {
+      // Lors de la première connexion
       if (user) {
         token.sub = user.id;
         token.email = user.email;
         token.name = user.name;
         token.picture = user.image;
       }
+      // Stocker les tokens OAuth
       if (account) {
         token.accessToken = account.access_token;
         token.refreshToken = account.refresh_token;
         token.expiresAt = account.expires_at;
+        token.provider = account.provider;
       }
       return token;
     },
@@ -105,9 +170,14 @@ export const authOptions: NextAuthOptions = {
       if (session.user && token.sub) {
         session.user.id = token.sub;
       }
+      // Ajouter les tokens OAuth à la session si nécessaire
+      if (token.accessToken) {
+        (session as any).accessToken = token.accessToken;
+      }
       return session;
     },
     async redirect({ url, baseUrl }) {
+      // Toujours rediriger vers /dashboard après authentification
       if (url.includes("/auth/signin") || url.includes("/api/auth")) {
         return `${baseUrl}/dashboard`;
       }
