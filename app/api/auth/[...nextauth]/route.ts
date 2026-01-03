@@ -218,6 +218,62 @@ authOptions.events = {
 // Ajouter debug en développement
 authOptions.debug = process.env.NODE_ENV === "development";
 
-const handler = NextAuth(authOptions);
+let handler: ReturnType<typeof NextAuth>;
 
-export { handler as GET, handler as POST };
+try {
+  handler = NextAuth(authOptions);
+  console.log("✅ [NEXTAUTH] Handler NextAuth créé avec succès");
+} catch (error) {
+  console.error("❌ [NEXTAUTH] Erreur lors de la création du handler:", error);
+  throw error;
+}
+
+export async function GET(
+  req: Request,
+  context: { params: Promise<{ nextauth: string[] }> } | { params: { nextauth: string[] } }
+) {
+  try {
+    console.log("📥 [NEXTAUTH] GET request:", req.url);
+    const response = await handler(req);
+    console.log("✅ [NEXTAUTH] GET response:", response.status);
+    return response;
+  } catch (error) {
+    console.error("❌ [NEXTAUTH] Erreur GET:", error);
+    return new Response(
+      JSON.stringify({ 
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined
+      }),
+      { 
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      }
+    );
+  }
+}
+
+export async function POST(
+  req: Request,
+  context: { params: Promise<{ nextauth: string[] }> } | { params: { nextauth: string[] } }
+) {
+  try {
+    console.log("📥 [NEXTAUTH] POST request:", req.url);
+    const response = await handler(req);
+    console.log("✅ [NEXTAUTH] POST response:", response.status);
+    return response;
+  } catch (error) {
+    console.error("❌ [NEXTAUTH] Erreur POST:", error);
+    return new Response(
+      JSON.stringify({ 
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined
+      }),
+      { 
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      }
+    );
+  }
+}

@@ -23,6 +23,14 @@ export default function SignInPage() {
       const error = searchParams.get("error");
       if (error) {
         console.error("🔵 [SIGNIN] Erreur détectée:", error);
+        console.error("🔵 [SIGNIN] URL complète:", window.location.href);
+        console.error("🔵 [SIGNIN] Tous les paramètres:", Object.fromEntries(searchParams.entries()));
+        
+        // Afficher un message d'erreur plus détaillé
+        if (error === "Callback") {
+          console.error("🔵 [SIGNIN] Erreur Callback - Le callback OAuth a échoué");
+          console.error("🔵 [SIGNIN] Vérifiez les logs Vercel pour plus de détails");
+        }
       }
     }
   }, [status, session, router, searchParams]);
