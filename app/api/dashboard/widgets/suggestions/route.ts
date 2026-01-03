@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { getWidgetSuggestions } from "@/app/lib/dashboard/widget-suggestions";
 
 /**
@@ -8,9 +9,16 @@ import { getWidgetSuggestions } from "@/app/lib/dashboard/widget-suggestions";
  */
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireUser();
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Non authentifié" },
+        { status: 401 }
+      );
+    }
 
-    const suggestions = await getWidgetSuggestions(user.id);
+    const suggestions = await getWidgetSuggestions(session.user.id);
 
     return NextResponse.json({ suggestions });
   } catch (error) {

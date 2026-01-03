@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import prisma from "@/app/lib/prisma";
 import { getDefaultWidgets } from "@/app/lib/dashboard/widgets";
 
@@ -9,12 +10,30 @@ import { getDefaultWidgets } from "@/app/lib/dashboard/widgets";
  */
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireUser();
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Non authentifié" },
+        { status: 401 }
+      );
+    }
+    
+    const userId = session.user.id;
 
-    const widgets = await prisma.dashboardWidget.findMany({
-      where: { userId: user.id },
-      orderBy: { position: "asc" },
-    });
+    // Essayer de récupérer les widgets, mais retourner des widgets par défaut si l'utilisateur n'existe pas encore
+    let widgets;
+    try {
+      widgets = await prisma.dashboardWidget.findMany({
+        where: { userId },
+        orderBy: { position: "asc" },
+      });
+    } catch (error) {
+      console.error("[Dashboard Widgets] Erreur Prisma:", error);
+      // Retourner des widgets par défaut si Prisma échoue
+      const defaultWidgets = getDefaultWidgets();
+      return NextResponse.json({ widgets: defaultWidgets });
+    }
 
     // Si aucun widget, créer les widgets par défaut
     if (widgets.length === 0) {
@@ -23,7 +42,7 @@ export async function GET(request: NextRequest) {
         defaultWidgets.map((widget) =>
           prisma.dashboardWidget.create({
             data: {
-              userId: user.id,
+              userId,
               widgetType: widget.widgetType,
               position: widget.position,
               column: widget.column,
@@ -48,7 +67,7 @@ export async function GET(request: NextRequest) {
         missingWidgets.map((widget) =>
           prisma.dashboardWidget.create({
             data: {
-              userId: user.id,
+              userId,
               widgetType: widget.widgetType,
               position: widget.position,
               column: widget.column,
@@ -79,7 +98,16 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireUser();
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Non authentifié" },
+        { status: 401 }
+      );
+    }
+    
+    const userId = session.user.id;
     const body = await request.json();
     const { widgetType, position, column, row, size, visible, config } = body;
 
@@ -93,7 +121,7 @@ export async function POST(request: NextRequest) {
     const widget = await prisma.dashboardWidget.upsert({
       where: {
         userId_widgetType: {
-          userId: user.id,
+          userId,
           widgetType,
         },
       },
@@ -106,7 +134,7 @@ export async function POST(request: NextRequest) {
         config: config ?? undefined,
       },
       create: {
-        userId: user.id,
+        userId,
         widgetType,
         position: position ?? 0,
         column: column ?? 1,
@@ -133,7 +161,16 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const user = await requireUser();
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Non authentifié" },
+        { status: 401 }
+      );
+    }
+    
+    const userId = session.user.id;
     const body = await request.json();
     const { widgets } = body;
 
@@ -149,7 +186,7 @@ export async function PUT(request: NextRequest) {
         prisma.dashboardWidget.update({
           where: {
             userId_widgetType: {
-              userId: user.id,
+              userId,
               widgetType: widget.widgetType,
             },
           },
@@ -181,7 +218,16 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const user = await requireUser();
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Non authentifié" },
+        { status: 401 }
+      );
+    }
+    
+    const userId = session.user.id;
     const searchParams = request.nextUrl.searchParams;
     const widgetType = searchParams.get("widgetType");
 
@@ -195,7 +241,7 @@ export async function DELETE(request: NextRequest) {
     await prisma.dashboardWidget.delete({
       where: {
         userId_widgetType: {
-          userId: user.id,
+          userId,
           widgetType,
         },
       },
