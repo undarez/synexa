@@ -5,6 +5,11 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import prisma from "@/app/lib/prisma";
 import bcrypt from "bcrypt";
 
+// Vérifier que Prisma est initialisé
+if (!prisma) {
+  throw new Error("Prisma client n'est pas initialisé");
+}
+
 /**
  * Configuration NextAuth
  * Système d'authentification simple et sécurisé
@@ -72,8 +77,37 @@ export const authOptions: NextAuthOptions = {
 
   secret: process.env.NEXTAUTH_SECRET,
 
-  // Cookies sécurisés automatiquement en HTTPS (Vercel)
-  // NextAuth détecte automatiquement HTTPS et active Secure cookies
+  // Configuration explicite des cookies pour HTTPS (Vercel)
+  // Obligatoire pour que les cookies fonctionnent en production HTTPS
+  cookies: {
+    sessionToken: {
+      name: `${process.env.NODE_ENV === "production" ? "__Secure-" : ""}next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NEXTAUTH_URL?.startsWith("https://") ?? false,
+      },
+    },
+    callbackUrl: {
+      name: `${process.env.NODE_ENV === "production" ? "__Secure-" : ""}next-auth.callback-url`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NEXTAUTH_URL?.startsWith("https://") ?? false,
+      },
+    },
+    csrfToken: {
+      name: `${process.env.NODE_ENV === "production" ? "__Host-" : ""}next-auth.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NEXTAUTH_URL?.startsWith("https://") ?? false,
+      },
+    },
+  },
 
   callbacks: {
     async jwt({ token, user, account }) {
@@ -117,6 +151,47 @@ export const authOptions: NextAuthOptions = {
   },
 };
 
-const handler = NextAuth(authOptions);
+let handler: ReturnType<typeof NextAuth>;
 
-export { handler as GET, handler as POST };
+try {
+  handler = NextAuth(authOptions);
+} catch (error) {
+  console.error("❌ Erreur initialisation NextAuth:", error);
+  throw error;
+}
+
+export async function GET(req: Request) {
+  try {
+    return await handler(req);
+  } catch (error) {
+    console.error("❌ Erreur GET NextAuth:", error);
+    return new Response(
+      JSON.stringify({ 
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      }),
+      { 
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      }
+    );
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    return await handler(req);
+  } catch (error) {
+    console.error("❌ Erreur POST NextAuth:", error);
+    return new Response(
+      JSON.stringify({ 
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      }),
+      { 
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      }
+    );
+  }
+}
