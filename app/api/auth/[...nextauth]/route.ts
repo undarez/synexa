@@ -111,6 +111,7 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === "development",
   // Configuration cookies pour Vercel (HTTPS)
+  // useSecureCookies est automatique si NEXTAUTH_URL commence par https://
   cookies: {
     sessionToken: {
       name: `${process.env.NODE_ENV === "production" ? "__Secure-" : ""}next-auth.session-token`,
@@ -220,19 +221,33 @@ export const authOptions: NextAuthOptions = {
       });
       console.log("[D-LOG] Profile:", profile ? "Présent" : "Absent");
       
-      // Pour OAuth, on laisse toujours l'adapter Prisma créer/gérer l'utilisateur
-      if (account?.provider === "google" || account?.provider === "facebook") {
-        console.log("[D-LOG] ✅ Connexion OAuth détectée:", account.provider);
-        console.log("[D-LOG] ✅ Autorisation de la connexion");
-        console.log("[D-LOG] ✅ L'adapter Prisma va créer/mettre à jour l'utilisateur automatiquement");
+      try {
+        // Pour OAuth, on laisse toujours l'adapter Prisma créer/gérer l'utilisateur
+        if (account?.provider === "google" || account?.provider === "facebook") {
+          console.log("[D-LOG] ✅ Connexion OAuth détectée:", account.provider);
+          console.log("[D-LOG] ✅ Autorisation de la connexion");
+          console.log("[D-LOG] ✅ L'adapter Prisma va créer/mettre à jour l'utilisateur automatiquement");
+          console.log("=========================================");
+          return true;
+        }
+        
+        // Pour les autres cas (credentials, etc.), on laisse NextAuth gérer
+        console.log("[D-LOG] ✅ Connexion autorisée (credentials)");
         console.log("=========================================");
         return true;
+      } catch (error) {
+        console.error("=========================================");
+        console.error("❌ [D-LOG] ERREUR DANS CALLBACK SIGNIN");
+        console.error("=========================================");
+        console.error("[D-LOG] Erreur:", error);
+        if (error instanceof Error) {
+          console.error("[D-LOG] Message:", error.message);
+          console.error("[D-LOG] Stack:", error.stack);
+        }
+        console.error("=========================================");
+        // Ne pas retourner false ici, laisser NextAuth gérer l'erreur
+        throw error;
       }
-      
-      // Pour les autres cas (credentials, etc.), on laisse NextAuth gérer
-      console.log("[D-LOG] ✅ Connexion autorisée (credentials)");
-      console.log("=========================================");
-      return true;
     },
     async redirect({ url, baseUrl }) {
       console.log("=========================================");
