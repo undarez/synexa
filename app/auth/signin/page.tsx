@@ -1,121 +1,42 @@
 "use client";
 
-import { signIn, useSession } from "next-auth/react";
+import { signIn } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 
-// Forcer le rendu dynamique (pas de pré-rendu)
-export const dynamic = "force-dynamic";
-
-function SignInContent() {
-  const router = useRouter();
+export default function SignInPage() {
   const { data: session, status } = useSession();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
-  // Rediriger si déjà connecté
   useEffect(() => {
-    console.log("🔵 [CLIENT] Statut de session:", status);
     if (status === "authenticated") {
-      console.log("🔵 [CLIENT] Utilisateur authentifié, redirection vers /dashboard");
-      console.log("🔵 [CLIENT] Session:", session);
       router.push("/dashboard");
-    } else if (status === "unauthenticated") {
-      console.log("🔵 [CLIENT] Utilisateur non authentifié");
     }
-  }, [status, router, session]);
-
-  // Vérifier les erreurs dans l'URL (sans useSearchParams pour éviter Suspense)
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      console.log("🔵 [CLIENT] Vérification des paramètres URL");
-      console.log("🔵 [CLIENT] URL complète:", window.location.href);
-      const params = new URLSearchParams(window.location.search);
-      const errorParam = params.get("error");
-      const callbackUrl = params.get("callbackUrl");
-      
-      console.log("🔵 [CLIENT] Paramètres URL:", {
-        error: errorParam,
-        callbackUrl: callbackUrl,
-        allParams: Object.fromEntries(params.entries()),
-      });
-      
-      if (errorParam === "Callback") {
-        console.error("🔵 [CLIENT] Erreur Callback détectée");
-        setError("Erreur lors de la connexion. Vérifiez votre configuration OAuth.");
-      } else if (errorParam === "AccessDenied") {
-        console.warn("🔵 [CLIENT] Accès refusé détecté");
-        setError("Accès refusé. Vous avez annulé la connexion.");
-      } else if (errorParam) {
-        console.error("🔵 [CLIENT] Autre erreur détectée:", errorParam);
-        setError(`Erreur: ${errorParam}`);
-      }
-    }
-  }, []);
+  }, [status, router]);
 
   const handleGoogleSignIn = () => {
-    console.log("🔵 [CLIENT] Clic sur le bouton Google");
-    console.log("🔵 [CLIENT] URL actuelle:", window.location.href);
-    setIsLoading(true);
-    
-    signIn("google", { callbackUrl: "/dashboard" })
-      .then((result) => {
-        console.log("🔵 [CLIENT] Résultat signIn:", result);
-      })
-      .catch((error) => {
-        console.error("🔵 [CLIENT] Erreur signIn:", error);
-        setIsLoading(false);
-        setError("Erreur lors de la connexion Google");
-      });
-  };
-
-  const handleCredentialsSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-
-    const formData = new FormData(e.currentTarget);
-    const result = await signIn("credentials", {
-      email: formData.get("email") as string,
-      password: formData.get("password") as string,
-      callbackUrl: "/dashboard",
-      redirect: false,
-    });
-
-    if (result?.error) {
-      setError("Email ou mot de passe incorrect");
-      setIsLoading(false);
-    } else if (result?.ok) {
-      router.push("/dashboard");
-    }
+    signIn("google", { callbackUrl: "/dashboard" });
   };
 
   if (status === "loading") {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <p className="text-zinc-600 dark:text-zinc-400">Chargement...</p>
-        </div>
+        <p className="text-zinc-600 dark:text-zinc-400">Chargement...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
       <div className="w-full max-w-md rounded-lg border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <h1 className="mb-6 text-2xl font-semibold text-black dark:text-zinc-50">
           Connexion à Synexa
         </h1>
-        
-        <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
-          Connectez-vous pour accéder à votre assistant personnel
-        </p>
 
-        {/* Bouton Google */}
         <button
           onClick={handleGoogleSignIn}
-          disabled={isLoading}
-          className="mb-6 flex h-12 w-full items-center justify-center gap-3 rounded-lg border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-700"
+          className="flex h-12 w-full items-center justify-center gap-3 rounded-lg border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-700"
         >
           <svg className="h-5 w-5" viewBox="0 0 24 24">
             <path
@@ -135,47 +56,9 @@ function SignInContent() {
               d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
             />
           </svg>
-          Continuer avec Google
+          Se connecter avec Google
         </button>
-
-        <div className="mb-6 border-t border-zinc-200 pt-6 dark:border-zinc-800">
-          <p className="mb-4 text-center text-sm text-zinc-600 dark:text-zinc-400">
-            Ou connectez-vous avec email et mot de passe
-          </p>
-
-          {error && (
-            <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleCredentialsSignIn} className="flex flex-col gap-3">
-            <input
-              name="email"
-              type="email"
-              placeholder="Email"
-              required
-              className="h-12 rounded-lg border border-zinc-300 bg-white px-4 text-sm text-zinc-900 placeholder-zinc-500 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder-zinc-400 dark:focus:border-zinc-500"
-            />
-            <input
-              name="password"
-              type="password"
-              placeholder="Mot de passe"
-              required
-              className="h-12 rounded-lg border border-zinc-300 bg-white px-4 text-sm text-zinc-900 placeholder-zinc-500 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder-zinc-400 dark:focus:border-zinc-500"
-            />
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="h-12 rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-100"
-            >
-              {isLoading ? "Connexion..." : "Se connecter"}
-            </button>
-          </form>
-        </div>
       </div>
     </div>
   );
 }
-
-export default SignInContent;
