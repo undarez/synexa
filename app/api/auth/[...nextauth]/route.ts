@@ -31,7 +31,6 @@ export const authOptions: NextAuthOptions = {
   adapter: customPrismaAdapter,
   providers: [
     // Google Provider - seulement si les clés sont configurées
-    // Enlever les guillemets si présents
     ...(googleClientId && googleClientSecret
       ? [
           GoogleProvider({
@@ -41,7 +40,7 @@ export const authOptions: NextAuthOptions = {
               params: {
                 scope: "openid email profile https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events",
                 access_type: "offline",
-                prompt: "consent", // Force la demande de consentement pour obtenir les nouveaux scopes
+                prompt: "consent",
               },
             },
           }),
@@ -52,8 +51,6 @@ export const authOptions: NextAuthOptions = {
           console.error("=========================================");
           console.error("[D-LOG] GOOGLE_CLIENT_ID présent:", !!process.env.GOOGLE_CLIENT_ID);
           console.error("[D-LOG] GOOGLE_CLIENT_SECRET présent:", !!process.env.GOOGLE_CLIENT_SECRET);
-          console.error("[D-LOG] GOOGLE_CLIENT_ID valeur:", process.env.GOOGLE_CLIENT_ID ? "Présent (masqué)" : "Absent");
-          console.error("[D-LOG] GOOGLE_CLIENT_SECRET valeur:", process.env.GOOGLE_CLIENT_SECRET ? "Présent (masqué)" : "Absent");
           console.error("=========================================");
           return [];
         })()),
@@ -96,7 +93,6 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        // Retourner un objet avec les propriétés attendues par NextAuth
         console.log("[NextAuth Credentials] Connexion réussie pour:", user.email);
         return {
           id: user.id,
@@ -114,6 +110,36 @@ export const authOptions: NextAuthOptions = {
   pages: { signIn: "/auth/signin" },
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === "development",
+  // Configuration cookies pour Vercel (HTTPS)
+  cookies: {
+    sessionToken: {
+      name: `${process.env.NODE_ENV === "production" ? "__Secure-" : ""}next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NEXTAUTH_URL?.startsWith("https://") ?? false,
+      },
+    },
+    callbackUrl: {
+      name: `${process.env.NODE_ENV === "production" ? "__Secure-" : ""}next-auth.callback-url`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NEXTAUTH_URL?.startsWith("https://") ?? false,
+      },
+    },
+    csrfToken: {
+      name: `${process.env.NODE_ENV === "production" ? "__Host-" : ""}next-auth.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NEXTAUTH_URL?.startsWith("https://") ?? false,
+      },
+    },
+  },
   events: {
     async createUser({ user }) {
       console.log("=========================================");
@@ -212,48 +238,41 @@ export const authOptions: NextAuthOptions = {
       console.log("=========================================");
       console.log("🔍 [D-LOG] CALLBACK REDIRECT");
       console.log("=========================================");
-      // NextAuth fournit baseUrl basé sur NEXTAUTH_URL - on l'utilise directement
-      // Enlever le slash final s'il existe
-      const finalBaseUrl = baseUrl.replace(/\/$/, '');
-      
       console.log("[D-LOG] URL reçue:", url);
       console.log("[D-LOG] BaseUrl (NextAuth):", baseUrl);
-      console.log("[D-LOG] BaseUrl (final, sans slash):", finalBaseUrl);
       console.log("[D-LOG] NEXTAUTH_URL (env):", process.env.NEXTAUTH_URL);
-      console.log("[D-LOG] VERCEL_URL (env):", process.env.VERCEL_URL);
       
-      // Extraire le chemin de l'URL
-      let path = "/";
-      try {
-        if (url.startsWith("/")) {
-          path = url.split("?")[0]; // Enlever les query params
-        } else if (url.startsWith("http://") || url.startsWith("https://")) {
-          const urlObj = new URL(url);
-          path = urlObj.pathname;
-        } else {
-          path = url;
-        }
-      } catch (e) {
-        console.error("[NextAuth Redirect] Erreur parsing URL:", e);
-        path = "/dashboard";
-      }
+      // NextAuth fournit baseUrl basé sur NEXTAUTH_URL - utiliser directement
+      const finalBaseUrl = baseUrl.replace(/\/$/, '');
       
-      // Toujours rediriger vers /dashboard sauf si c'est déjà une route protégée valide
-      const validRoutes = ["/dashboard", "/calendar", "/tasks", "/reminders", "/routines", "/devices", "/profile", "/synexa", "/energy", "/weather", "/news"];
-      
-      // Si c'est la page de connexion, l'accueil, ou une route invalide, rediriger vers dashboard
-      if (path === "/" || path.startsWith("/auth/") || path === "/signin" || !validRoutes.some(route => path.startsWith(route))) {
-        const redirectTo = `${finalBaseUrl}/dashboard`;
-        console.log("[D-LOG] ✅ Redirection vers /dashboard");
-        console.log("[D-LOG] URL finale:", redirectTo);
+      // Si l'URL est relative, la construire avec baseUrl
+      if (url.startsWith("/")) {
+        const redirectUrl = `${finalBaseUrl}${url}`;
+        console.log("[D-LOG] ✅ Redirection relative:", redirectUrl);
         console.log("=========================================");
-        return redirectTo;
+        return redirectUrl;
       }
       
-      // Sinon, utiliser l'URL demandée
-      const redirectUrl = url.startsWith("/") ? `${finalBaseUrl}${url}` : url;
-      console.log("[D-LOG] ✅ Redirection vers:", path);
-      console.log("[D-LOG] URL finale:", redirectUrl);
+      // Si l'URL est absolue et pointe vers notre domaine, l'utiliser
+      if (url.startsWith("http://") || url.startsWith("https://")) {
+        try {
+          const urlObj = new URL(url);
+          const baseUrlObj = new URL(baseUrl);
+          
+          // Si c'est le même domaine, utiliser l'URL telle quelle
+          if (urlObj.origin === baseUrlObj.origin) {
+            console.log("[D-LOG] ✅ Redirection même domaine:", url);
+            console.log("=========================================");
+            return url;
+          }
+        } catch (e) {
+          console.error("[D-LOG] ❌ Erreur parsing URL:", e);
+        }
+      }
+      
+      // Par défaut, rediriger vers /dashboard
+      const redirectUrl = `${finalBaseUrl}/dashboard`;
+      console.log("[D-LOG] ✅ Redirection par défaut:", redirectUrl);
       console.log("=========================================");
       return redirectUrl;
     },

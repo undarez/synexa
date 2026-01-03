@@ -191,7 +191,7 @@ function SignInContent() {
                 console.log("=========================================");
                 console.log("[D-LOG CLIENT] Callback URL:", "/dashboard");
                 console.log("[D-LOG CLIENT] Window location:", window.location.href);
-                console.log("[D-LOG CLIENT] NEXTAUTH_URL (si disponible):", process.env.NEXT_PUBLIC_NEXTAUTH_URL || "Non défini");
+                // NEXTAUTH_URL n'est pas disponible côté client (c'est normal)
                 console.log("[D-LOG CLIENT] Appel signIn('google')...");
                 console.log("=========================================");
                 signIn("google", { callbackUrl: "/dashboard" });
