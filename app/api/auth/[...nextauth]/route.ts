@@ -95,7 +95,6 @@ export const authOptions: NextAuthOptions = {
   },
   pages: { signIn: "/auth/signin" },
   secret: process.env.NEXTAUTH_SECRET,
-  url: process.env.NEXTAUTH_URL, // IMPORTANT : NextAuth utilise cette URL pour générer les callbacks
   debug: process.env.NODE_ENV === "development",
   callbacks: {
     async signIn({ user, account }) {
