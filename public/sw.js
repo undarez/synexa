@@ -1,9 +1,39 @@
 // Service Worker pour PWA et notifications push
-const CACHE_NAME = "synexa-v1";
+// Version corrigée pour éviter les conflits avec NextAuth OAuth
+const CACHE_NAME = "synexa-v2"; // Version incrémentée pour forcer la mise à jour
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
 ];
+
+// Routes qui ne doivent JAMAIS être mises en cache
+const NEVER_CACHE = [
+  "/api/",
+  "/auth/",
+  "/dashboard",
+  "/profile",
+  "/calendar",
+  "/tasks",
+  "/reminders",
+  "/routines",
+  "/devices",
+  "/admin",
+];
+
+// Vérifier si une URL ne doit jamais être mise en cache
+function shouldNeverCache(url) {
+  return NEVER_CACHE.some((route) => url.pathname.startsWith(route));
+}
+
+// Vérifier si une réponse contient des cookies de session
+function hasSessionCookies(response) {
+  const setCookie = response.headers.get("set-cookie");
+  return setCookie && (
+    setCookie.includes("next-auth") ||
+    setCookie.includes("__Secure-next-auth") ||
+    setCookie.includes("session-token")
+  );
+}
 
 self.addEventListener("install", (event) => {
   console.log("[SW] Service Worker installé");
@@ -12,7 +42,8 @@ self.addEventListener("install", (event) => {
       return cache.addAll(STATIC_ASSETS);
     })
   );
-  self.skipWaiting();
+  // Ne pas utiliser skipWaiting() pour éviter d'interrompre les flux OAuth
+  // self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -22,14 +53,25 @@ self.addEventListener("activate", (event) => {
       return Promise.all(
         cacheNames
           .filter((name) => name !== CACHE_NAME)
-          .map((name) => caches.delete(name))
+          .map((name) => {
+            console.log("[SW] Suppression ancien cache:", name);
+            return caches.delete(name);
+          })
       );
     })
   );
-  event.waitUntil(self.clients.claim());
+  // Retarder clients.claim() pour éviter de prendre le contrôle trop tôt
+  event.waitUntil(
+    new Promise((resolve) => {
+      setTimeout(() => {
+        self.clients.claim();
+        resolve();
+      }, 100);
+    })
+  );
 });
 
-// Cache strategy: Network first, fallback to cache
+// Cache strategy: Network first, fallback to cache (sauf pour routes critiques)
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   
@@ -41,18 +83,27 @@ self.addEventListener("fetch", (event) => {
   try {
     const url = new URL(request.url);
 
-    // Ne pas mettre en cache les requêtes API
-    if (url.pathname.startsWith("/api/")) {
-      return;
-    }
-
-    // Ne pas mettre en cache les routes d'authentification
-    if (url.pathname.startsWith("/auth/")) {
+    // Vérifier AVANT d'intercepter si on doit ignorer cette requête
+    if (shouldNeverCache(url)) {
+      // Pour les routes critiques, forcer le rechargement depuis le réseau
+      // et ne jamais servir depuis le cache
+      event.respondWith(
+        fetch(request, {
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+          },
+        }).catch(() => {
+          // Même en cas d'erreur réseau, ne pas servir depuis le cache
+          // pour les routes critiques
+          return new Response("Network error", { status: 503 });
+        })
+      );
       return;
     }
 
     // Ne pas mettre en cache les requêtes avec des schémas non supportés
-    // (chrome-extension:, data:, blob:, etc.)
     if (url.protocol !== "http:" && url.protocol !== "https:") {
       return;
     }
@@ -62,10 +113,23 @@ self.addEventListener("fetch", (event) => {
       return;
     }
 
+    // Pour les autres routes, utiliser network-first avec cache
     event.respondWith(
-      fetch(request)
+      fetch(request, {
+        cache: "no-cache", // Forcer la vérification avec le serveur
+        headers: {
+          "Cache-Control": "no-cache",
+        },
+      })
         .then((response) => {
+          // Ne jamais mettre en cache les réponses avec des cookies de session
+          if (hasSessionCookies(response)) {
+            console.log("[SW] Réponse avec cookies de session, pas de cache");
+            return response;
+          }
+
           // Mettre en cache uniquement les réponses GET réussies avec un type "basic"
+          // et qui ne contiennent pas de cookies de session
           if (response.status === 200 && response.type === "basic") {
             try {
               const responseToCache = response.clone();
@@ -81,12 +145,13 @@ self.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(() => {
-          // Fallback vers le cache si le réseau échoue
+          // Fallback vers le cache uniquement pour les routes non critiques
           return caches.match(request);
         })
     );
   } catch (err) {
     // Si l'URL ne peut pas être parsée, ignorer la requête
+    console.error("[SW] Erreur parsing URL:", err);
     return;
   }
 });
@@ -154,5 +219,6 @@ self.addEventListener("notificationclick", (event) => {
       })
   );
 });
+
 
 
