@@ -5,6 +5,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { customPrismaAdapter } from "@/app/lib/auth/prisma-adapter";
 import prisma from "@/app/lib/prisma";
 import bcrypt from "bcrypt";
+import { NextRequest } from "next/server";
 
 // ============================================
 // 🔍 LOGS DE CONFIGURATION DÉTAILLÉS
@@ -418,21 +419,14 @@ export const authOptions: NextAuthOptions = {
 // ============================================
 const handler = NextAuth(authOptions);
 
-// Wrapper pour capturer les erreurs et les logs
-async function logRequest(method: string, request: Request) {
+export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   console.log("=========================================");
-  console.log(`🔍 [D-LOG] ${method} REQUEST - NEXTAUTH`);
+  console.log("🔍 [D-LOG] GET REQUEST - NEXTAUTH");
   console.log("=========================================");
   console.log("[D-LOG] URL complète:", request.url);
   console.log("[D-LOG] Pathname:", url.pathname);
   console.log("[D-LOG] Search params:", Object.fromEntries(url.searchParams.entries()));
-  console.log("[D-LOG] Headers:", {
-    host: request.headers.get("host"),
-    referer: request.headers.get("referer"),
-    origin: request.headers.get("origin"),
-    "user-agent": request.headers.get("user-agent")?.substring(0, 50),
-  });
   
   // Si c'est un callback OAuth, logger les paramètres importants
   if (url.pathname.includes("/callback")) {
@@ -443,19 +437,12 @@ async function logRequest(method: string, request: Request) {
     console.log("[D-LOG]   - Code:", code ? "Présent" : "Absent");
     console.log("[D-LOG]   - Error:", error || "Absent");
     console.log("[D-LOG]   - State:", state || "Absent");
-    console.log("[D-LOG]   - Tous les params:", Object.fromEntries(url.searchParams.entries()));
   }
-}
-
-export async function GET(request: Request, context: any) {
-  await logRequest("GET", request);
   
   try {
-    const response = await handler.GET(request, context);
-    const url = new URL(request.url);
+    const response = await handler.GET(request as any);
     
     console.log("[D-LOG] ✅ GET Response status:", response.status);
-    console.log("[D-LOG] ✅ GET Response statusText:", response.statusText);
     
     // Si c'est une redirection, logger la destination
     if (response.status >= 300 && response.status < 400) {
@@ -468,7 +455,6 @@ export async function GET(request: Request, context: any) {
       console.error("[D-LOG] ❌ ERREUR DANS CALLBACK:");
       console.error("[D-LOG]   - Error:", url.searchParams.get("error"));
       console.error("[D-LOG]   - Error description:", url.searchParams.get("error_description"));
-      console.error("[D-LOG]   - Error URI:", url.searchParams.get("error_uri"));
     }
     
     console.log("=========================================");
@@ -487,11 +473,16 @@ export async function GET(request: Request, context: any) {
   }
 }
 
-export async function POST(request: Request, context: any) {
-  await logRequest("POST", request);
+export async function POST(request: NextRequest) {
+  const url = new URL(request.url);
+  console.log("=========================================");
+  console.log("🔍 [D-LOG] POST REQUEST - NEXTAUTH");
+  console.log("=========================================");
+  console.log("[D-LOG] URL complète:", request.url);
+  console.log("[D-LOG] Pathname:", url.pathname);
   
   try {
-    const response = await handler.POST(request, context);
+    const response = await handler.POST(request as any);
     console.log("[D-LOG] ✅ POST Response status:", response.status);
     console.log("=========================================");
     return response;
