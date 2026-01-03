@@ -21,6 +21,10 @@ export const customPrismaAdapter: Adapter = {
       image: data.image,
     });
     
+    if (!baseAdapter.createUser) {
+      throw new Error("createUser method not available on baseAdapter");
+    }
+    
     try {
       const user = await baseAdapter.createUser(data);
       console.log("[PrismaAdapter] createUser SUCCÈS:", {
@@ -42,6 +46,9 @@ export const customPrismaAdapter: Adapter = {
   
   async getUser(id: string) {
     console.log("[PrismaAdapter] getUser appelé avec id:", id);
+    if (!baseAdapter.getUser) {
+      throw new Error("getUser method not available on baseAdapter");
+    }
     try {
       const user = await baseAdapter.getUser(id);
       console.log("[PrismaAdapter] getUser résultat:", user ? { id: user.id, email: user.email } : "null");
@@ -54,6 +61,9 @@ export const customPrismaAdapter: Adapter = {
   
   async getUserByEmail(email: string) {
     console.log("[PrismaAdapter] getUserByEmail appelé avec email:", email);
+    if (!baseAdapter.getUserByEmail) {
+      throw new Error("getUserByEmail method not available on baseAdapter");
+    }
     try {
       const user = await baseAdapter.getUserByEmail(email);
       console.log("[PrismaAdapter] getUserByEmail résultat:", user ? { id: user.id, email: user.email } : "null");
@@ -70,6 +80,10 @@ export const customPrismaAdapter: Adapter = {
       provider: data.provider,
       providerAccountId: data.providerAccountId,
     });
+    
+    if (!baseAdapter.linkAccount) {
+      throw new Error("linkAccount method not available on baseAdapter");
+    }
     
     // Filtrer refresh_token_expires_in qui n'existe pas dans le schéma Prisma
     const { refresh_token_expires_in, ...accountData } = data;
