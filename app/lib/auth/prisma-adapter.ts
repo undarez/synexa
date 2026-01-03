@@ -7,27 +7,17 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { Adapter, AdapterUser } from "next-auth/adapters";
 import prisma from "@/app/lib/prisma";
 
-console.log("=========================================");
-console.log("🔍 [D-LOG] INITIALISATION PRISMA ADAPTER");
-console.log("=========================================");
-console.log("[D-LOG] Prisma client initialisé:", !!prisma);
-console.log("=========================================");
-
 // Créer l'adaptateur Prisma de base
-const baseAdapter = PrismaAdapter(prisma) as Adapter;
-
-console.log("=========================================");
-console.log("🔍 [D-LOG] BASE ADAPTER CRÉÉ");
-console.log("=========================================");
-console.log("[D-LOG] Méthodes disponibles:", {
-  createUser: !!baseAdapter.createUser,
-  getUser: !!baseAdapter.getUser,
-  getUserByEmail: !!baseAdapter.getUserByEmail,
-  linkAccount: !!baseAdapter.linkAccount,
-  createSession: !!baseAdapter.createSession,
-  getSessionAndUser: !!baseAdapter.getSessionAndUser,
-});
-console.log("=========================================");
+let baseAdapter: Adapter;
+try {
+  baseAdapter = PrismaAdapter(prisma) as Adapter;
+} catch (error) {
+  console.error("=========================================");
+  console.error("❌ [D-LOG] ERREUR INITIALISATION PRISMA ADAPTER");
+  console.error("=========================================");
+  console.error("[D-LOG] Erreur:", error);
+  throw error;
+}
 
 // Créer un adaptateur personnalisé qui filtre refresh_token_expires_in
 export const customPrismaAdapter: Adapter = {

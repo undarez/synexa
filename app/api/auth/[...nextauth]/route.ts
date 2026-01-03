@@ -463,37 +463,72 @@ export const authOptions: NextAuthOptions = {
 // ============================================
 // 🔍 HANDLER NEXTAUTH
 // ============================================
-console.log("=========================================");
-console.log("🔍 [D-LOG] CRÉATION HANDLER NEXTAUTH");
-console.log("=========================================");
-console.log("[D-LOG] authOptions configuré:", {
-  hasAdapter: !!authOptions.adapter,
-  providersCount: authOptions.providers?.length || 0,
-  hasSecret: !!authOptions.secret,
-  hasCookies: !!authOptions.cookies,
-});
-console.log("=========================================");
-
-const handler = NextAuth(authOptions);
+let handler: ReturnType<typeof NextAuth>;
+try {
+  handler = NextAuth(authOptions);
+} catch (error) {
+  console.error("=========================================");
+  console.error("❌ [D-LOG] ERREUR CRÉATION HANDLER NEXTAUTH");
+  console.error("=========================================");
+  console.error("[D-LOG] Erreur:", error);
+  if (error instanceof Error) {
+    console.error("[D-LOG] Message:", error.message);
+    console.error("[D-LOG] Stack:", error.stack);
+  }
+  console.error("=========================================");
+  throw error;
+}
 
 export async function GET(req: Request) {
-  const url = new URL(req.url);
-  console.log("=========================================");
-  console.log("🔍 [D-LOG] GET REQUEST NEXTAUTH");
-  console.log("=========================================");
-  console.log("[D-LOG] URL:", url.pathname + url.search);
-  console.log("[D-LOG] Query params:", Object.fromEntries(url.searchParams.entries()));
-  console.log("=========================================");
-  return handler(req);
+  try {
+    const url = new URL(req.url);
+    console.log("=========================================");
+    console.log("🔍 [D-LOG] GET REQUEST NEXTAUTH");
+    console.log("=========================================");
+    console.log("[D-LOG] URL:", url.pathname + url.search);
+    console.log("[D-LOG] Query params:", Object.fromEntries(url.searchParams.entries()));
+    console.log("=========================================");
+    return await handler(req);
+  } catch (error) {
+    console.error("=========================================");
+    console.error("❌ [D-LOG] ERREUR GET HANDLER");
+    console.error("=========================================");
+    console.error("[D-LOG] Erreur:", error);
+    if (error instanceof Error) {
+      console.error("[D-LOG] Message:", error.message);
+      console.error("[D-LOG] Stack:", error.stack);
+    }
+    console.error("=========================================");
+    return new Response(JSON.stringify({ error: "Internal Server Error" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 }
 
 export async function POST(req: Request) {
-  const url = new URL(req.url);
-  console.log("=========================================");
-  console.log("🔍 [D-LOG] POST REQUEST NEXTAUTH");
-  console.log("=========================================");
-  console.log("[D-LOG] URL:", url.pathname + url.search);
-  console.log("[D-LOG] Query params:", Object.fromEntries(url.searchParams.entries()));
-  console.log("=========================================");
-  return handler(req);
+  try {
+    const url = new URL(req.url);
+    console.log("=========================================");
+    console.log("🔍 [D-LOG] POST REQUEST NEXTAUTH");
+    console.log("=========================================");
+    console.log("[D-LOG] URL:", url.pathname + url.search);
+    console.log("[D-LOG] Query params:", Object.fromEntries(url.searchParams.entries()));
+    console.log("=========================================");
+    return await handler(req);
+  } catch (error) {
+    console.error("=========================================");
+    console.error("❌ [D-LOG] ERREUR POST HANDLER");
+    console.error("=========================================");
+    console.error("[D-LOG] Erreur:", error);
+    if (error instanceof Error) {
+      console.error("[D-LOG] Message:", error.message);
+      console.error("[D-LOG] Stack:", error.stack);
+    }
+    console.error("=========================================");
+    return new Response(JSON.stringify({ error: "Internal Server Error" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 }
