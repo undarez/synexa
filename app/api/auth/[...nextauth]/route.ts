@@ -110,43 +110,63 @@ export const authOptions: NextAuthOptions = {
   },
 
   callbacks: {
+    async signIn() {
+      // Autoriser la connexion
+      return true;
+    },
+
     async jwt({ token, user, account }) {
-      // Lors de la première connexion
-      if (user) {
-        token.sub = user.id;
-        token.email = user.email;
-        token.name = user.name;
-        token.picture = user.image;
-      }
+      try {
+        // Lors de la première connexion
+        if (user) {
+          token.sub = user.id;
+          token.email = user.email;
+          token.name = user.name;
+          token.picture = user.image;
+        }
 
-      // Stocker les tokens OAuth
-      if (account) {
-        token.accessToken = account.access_token;
-        token.refreshToken = account.refresh_token;
-        token.expiresAt = account.expires_at;
-      }
+        // Stocker les tokens OAuth
+        if (account) {
+          token.accessToken = account.access_token;
+          token.refreshToken = account.refresh_token;
+          token.expiresAt = account.expires_at;
+        }
 
-      return token;
+        return token;
+      } catch (error) {
+        console.error("❌ Erreur dans callback jwt:", error);
+        throw error;
+      }
     },
 
     async session({ session, token }) {
-      // Ajouter l'ID utilisateur à la session
-      if (session.user && token.sub) {
-        session.user.id = token.sub;
-      }
+      try {
+        // Ajouter l'ID utilisateur à la session
+        if (session.user && token.sub) {
+          session.user.id = token.sub;
+        }
 
-      return session;
+        return session;
+      } catch (error) {
+        console.error("❌ Erreur dans callback session:", error);
+        throw error;
+      }
     },
 
     async redirect({ url, baseUrl }) {
-      // Rediriger vers /dashboard après connexion
-      if (url.startsWith("/")) {
-        return `${baseUrl}${url}`;
+      try {
+        // Rediriger vers /dashboard après connexion
+        if (url.startsWith("/")) {
+          return `${baseUrl}${url}`;
+        }
+        if (new URL(url).origin === baseUrl) {
+          return url;
+        }
+        return `${baseUrl}/dashboard`;
+      } catch (error) {
+        console.error("❌ Erreur dans callback redirect:", error);
+        return `${baseUrl}/dashboard`;
       }
-      if (new URL(url).origin === baseUrl) {
-        return url;
-      }
-      return `${baseUrl}/dashboard`;
     },
   },
 };

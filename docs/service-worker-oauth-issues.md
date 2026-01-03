@@ -115,3 +115,4 @@
 
 **Solution** : Ne jamais servir depuis le cache pour les routes d'authentification, même en cas d'erreur réseau
 
+

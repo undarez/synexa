@@ -70,3 +70,4 @@
 - **Routes protégées** : Ajouter toute nouvelle route protégée à `NEVER_CACHE`
 - **Cookies** : Vérifier que les noms de cookies dans `hasSessionCookies()` correspondent à ceux de NextAuth
 
+
