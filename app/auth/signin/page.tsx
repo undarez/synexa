@@ -2,7 +2,10 @@
 
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect } from "react";
+
+// Forcer le rendu dynamique (pas de pré-rendu)
+export const dynamic = "force-dynamic";
 
 function SignInContent() {
   const router = useRouter();
@@ -144,16 +147,4 @@ function SignInContent() {
   );
 }
 
-export default function SignInPage() {
-  return (
-    <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <p className="text-zinc-600 dark:text-zinc-400">Chargement...</p>
-        </div>
-      </div>
-    }>
-      <SignInContent />
-    </Suspense>
-  );
-}
+export default SignInContent;
