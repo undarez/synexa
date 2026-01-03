@@ -95,15 +95,36 @@ async function getDashboardData(userId: string) {
 }
 
 export default async function Dashboard() {
-  const session = await getServerSession(authOptions);
+  try {
+    const session = await getServerSession(authOptions);
 
-  if (!session?.user?.id) {
-    redirect("/auth/signin");
-  }
+    if (!session?.user?.id) {
+      redirect("/auth/signin");
+    }
 
-  const brief = await getDashboardData(session.user.id);
-  const displayName = await getUserDisplayName(session.user.id);
-  const currentDate = new Date();
+    // Essayer de récupérer les données, mais continuer même si ça échoue
+    let brief: Awaited<ReturnType<typeof getDashboardData>>;
+    let displayName: string;
+    
+    try {
+      brief = await getDashboardData(session.user.id);
+    } catch (error) {
+      console.error("[DASHBOARD] Erreur getDashboardData:", error);
+      brief = {
+        agenda: [],
+        tasks: [],
+        activeRoutines: [],
+      };
+    }
+
+    try {
+      displayName = await getUserDisplayName(session.user.id);
+    } catch (error) {
+      console.error("[DASHBOARD] Erreur getUserDisplayName:", error);
+      displayName = session.user.name || session.user.email || "Utilisateur";
+    }
+    
+    const currentDate = new Date();
   const formattedDate = currentDate.toLocaleDateString("fr-FR", {
     weekday: "long",
     year: "numeric",
@@ -182,5 +203,10 @@ export default async function Dashboard() {
       <Footer />
     </div>
   );
+  } catch (error) {
+    console.error("[DASHBOARD] Erreur critique:", error);
+    // En cas d'erreur, rediriger vers la page de connexion
+    redirect("/auth/signin?error=dashboard_error");
+  }
 }
 
