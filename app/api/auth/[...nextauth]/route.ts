@@ -413,5 +413,98 @@ export const authOptions: NextAuthOptions = {
   },
 };
 
+// ============================================
+// 🔍 HANDLER NEXTAUTH AVEC LOGS DÉTAILLÉS
+// ============================================
 const handler = NextAuth(authOptions);
-export { handler as GET, handler as POST };
+
+// Wrapper pour capturer les erreurs et les logs
+async function logRequest(method: string, request: Request) {
+  const url = new URL(request.url);
+  console.log("=========================================");
+  console.log(`🔍 [D-LOG] ${method} REQUEST - NEXTAUTH`);
+  console.log("=========================================");
+  console.log("[D-LOG] URL complète:", request.url);
+  console.log("[D-LOG] Pathname:", url.pathname);
+  console.log("[D-LOG] Search params:", Object.fromEntries(url.searchParams.entries()));
+  console.log("[D-LOG] Headers:", {
+    host: request.headers.get("host"),
+    referer: request.headers.get("referer"),
+    origin: request.headers.get("origin"),
+    "user-agent": request.headers.get("user-agent")?.substring(0, 50),
+  });
+  
+  // Si c'est un callback OAuth, logger les paramètres importants
+  if (url.pathname.includes("/callback")) {
+    const code = url.searchParams.get("code");
+    const error = url.searchParams.get("error");
+    const state = url.searchParams.get("state");
+    console.log("[D-LOG] ⚠️ CALLBACK OAUTH DÉTECTÉ:");
+    console.log("[D-LOG]   - Code:", code ? "Présent" : "Absent");
+    console.log("[D-LOG]   - Error:", error || "Absent");
+    console.log("[D-LOG]   - State:", state || "Absent");
+    console.log("[D-LOG]   - Tous les params:", Object.fromEntries(url.searchParams.entries()));
+  }
+}
+
+export async function GET(request: Request, context: any) {
+  await logRequest("GET", request);
+  
+  try {
+    const response = await handler.GET(request, context);
+    const url = new URL(request.url);
+    
+    console.log("[D-LOG] ✅ GET Response status:", response.status);
+    console.log("[D-LOG] ✅ GET Response statusText:", response.statusText);
+    
+    // Si c'est une redirection, logger la destination
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      console.log("[D-LOG] ✅ Redirection vers:", location);
+    }
+    
+    // Si c'est un callback et qu'il y a une erreur, logger plus de détails
+    if (url.pathname.includes("/callback") && url.searchParams.get("error")) {
+      console.error("[D-LOG] ❌ ERREUR DANS CALLBACK:");
+      console.error("[D-LOG]   - Error:", url.searchParams.get("error"));
+      console.error("[D-LOG]   - Error description:", url.searchParams.get("error_description"));
+      console.error("[D-LOG]   - Error URI:", url.searchParams.get("error_uri"));
+    }
+    
+    console.log("=========================================");
+    return response;
+  } catch (error) {
+    console.error("=========================================");
+    console.error("❌ [D-LOG] EXCEPTION DANS GET HANDLER");
+    console.error("=========================================");
+    console.error("[D-LOG] Erreur:", error);
+    if (error instanceof Error) {
+      console.error("[D-LOG] Message:", error.message);
+      console.error("[D-LOG] Stack:", error.stack);
+    }
+    console.error("=========================================");
+    throw error;
+  }
+}
+
+export async function POST(request: Request, context: any) {
+  await logRequest("POST", request);
+  
+  try {
+    const response = await handler.POST(request, context);
+    console.log("[D-LOG] ✅ POST Response status:", response.status);
+    console.log("=========================================");
+    return response;
+  } catch (error) {
+    console.error("=========================================");
+    console.error("❌ [D-LOG] EXCEPTION DANS POST HANDLER");
+    console.error("=========================================");
+    console.error("[D-LOG] Erreur:", error);
+    if (error instanceof Error) {
+      console.error("[D-LOG] Message:", error.message);
+      console.error("[D-LOG] Stack:", error.stack);
+    }
+    console.error("=========================================");
+    throw error;
+  }
+}
