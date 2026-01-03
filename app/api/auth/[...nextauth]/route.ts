@@ -144,7 +144,7 @@ export const authOptions: NextAuthOptions = {
   events: {
     async createUser({ user }) {
       console.log("=========================================");
-      console.log("🔍 [D-LOG] EVENT: USER CREATED");
+      console.log("🎉 [D-LOG] EVENT: USER CREATED");
       console.log("=========================================");
       console.log("[D-LOG] User créé:", {
         id: user.id,
@@ -156,7 +156,7 @@ export const authOptions: NextAuthOptions = {
     },
     async signIn({ user, account, profile }) {
       console.log("=========================================");
-      console.log("🔍 [D-LOG] EVENT: SIGN IN");
+      console.log("➡️ [D-LOG] EVENT: SIGN IN");
       console.log("=========================================");
       console.log("[D-LOG] Connexion réussie:", {
         userId: user?.id,
@@ -170,11 +170,19 @@ export const authOptions: NextAuthOptions = {
         scope: account?.scope,
       });
       console.log("[D-LOG] Profile:", profile ? "Présent" : "Absent");
+      if (profile && typeof profile === 'object') {
+        const profileObj = profile as Record<string, unknown>;
+        console.log("[D-LOG] Profile details:", {
+          email: profileObj?.email,
+          name: profileObj?.name,
+          picture: profileObj?.picture ? "Présent" : "Absent",
+        });
+      }
       console.log("=========================================");
     },
     async linkAccount({ user, account }) {
       console.log("=========================================");
-      console.log("🔍 [D-LOG] EVENT: ACCOUNT LINKED");
+      console.log("🔗 [D-LOG] EVENT: ACCOUNT LINKED");
       console.log("=========================================");
       console.log("[D-LOG] Compte lié:", {
         userId: user.id,
@@ -182,12 +190,15 @@ export const authOptions: NextAuthOptions = {
         provider: account.provider,
         accountId: account.providerAccountId,
         accountType: account.type,
+        hasAccessToken: !!account.access_token,
+        hasRefreshToken: !!account.refresh_token,
+        expiresAt: account.expires_at,
       });
       console.log("=========================================");
     },
     async session({ session, token }) {
       console.log("=========================================");
-      console.log("🔍 [D-LOG] EVENT: SESSION CREATED");
+      console.log("📝 [D-LOG] EVENT: SESSION CREATED");
       console.log("=========================================");
       console.log("[D-LOG] Session créée:", {
         userId: session.user?.id,
@@ -195,6 +206,8 @@ export const authOptions: NextAuthOptions = {
         name: session.user?.name,
         hasToken: !!token.sub,
         tokenSub: token.sub,
+        hasAccessToken: !!token.accessToken,
+        hasRefreshToken: !!token.refreshToken,
       });
       console.log("=========================================");
     },
@@ -450,6 +463,37 @@ export const authOptions: NextAuthOptions = {
 // ============================================
 // 🔍 HANDLER NEXTAUTH
 // ============================================
+console.log("=========================================");
+console.log("🔍 [D-LOG] CRÉATION HANDLER NEXTAUTH");
+console.log("=========================================");
+console.log("[D-LOG] authOptions configuré:", {
+  hasAdapter: !!authOptions.adapter,
+  providersCount: authOptions.providers?.length || 0,
+  hasSecret: !!authOptions.secret,
+  hasCookies: !!authOptions.cookies,
+});
+console.log("=========================================");
+
 const handler = NextAuth(authOptions);
 
-export { handler as GET, handler as POST };
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  console.log("=========================================");
+  console.log("🔍 [D-LOG] GET REQUEST NEXTAUTH");
+  console.log("=========================================");
+  console.log("[D-LOG] URL:", url.pathname + url.search);
+  console.log("[D-LOG] Query params:", Object.fromEntries(url.searchParams.entries()));
+  console.log("=========================================");
+  return handler(req);
+}
+
+export async function POST(req: Request) {
+  const url = new URL(req.url);
+  console.log("=========================================");
+  console.log("🔍 [D-LOG] POST REQUEST NEXTAUTH");
+  console.log("=========================================");
+  console.log("[D-LOG] URL:", url.pathname + url.search);
+  console.log("[D-LOG] Query params:", Object.fromEntries(url.searchParams.entries()));
+  console.log("=========================================");
+  return handler(req);
+}
