@@ -4,7 +4,7 @@
  */
 
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import { Adapter } from "next-auth/adapters";
+import { Adapter, AdapterUser } from "next-auth/adapters";
 import prisma from "@/app/lib/prisma";
 
 // Créer l'adaptateur Prisma de base
@@ -14,7 +14,7 @@ const baseAdapter = PrismaAdapter(prisma) as Adapter;
 export const customPrismaAdapter: Adapter = {
   ...baseAdapter,
   
-  async createUser(data) {
+  async createUser(data: Parameters<Adapter["createUser"]>[0]) {
     console.log("[PrismaAdapter] createUser appelé avec:", {
       email: data.email,
       name: data.name,
@@ -40,7 +40,7 @@ export const customPrismaAdapter: Adapter = {
     }
   },
   
-  async getUser(id) {
+  async getUser(id: string) {
     console.log("[PrismaAdapter] getUser appelé avec id:", id);
     try {
       const user = await baseAdapter.getUser(id);
@@ -52,7 +52,7 @@ export const customPrismaAdapter: Adapter = {
     }
   },
   
-  async getUserByEmail(email) {
+  async getUserByEmail(email: string) {
     console.log("[PrismaAdapter] getUserByEmail appelé avec email:", email);
     try {
       const user = await baseAdapter.getUserByEmail(email);
