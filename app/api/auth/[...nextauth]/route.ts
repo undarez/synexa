@@ -239,7 +239,10 @@ try {
   throw error;
 }
 
-export async function GET(req: Request) {
+export async function GET(
+  req: Request,
+  context: { params: Promise<{ nextauth: string[] }> | { nextauth: string[] } }
+) {
   const url = new URL(req.url);
   const pathname = url.pathname;
   const searchParams = url.searchParams;
@@ -250,8 +253,21 @@ export async function GET(req: Request) {
   console.log("📥 [NEXTAUTH] Search params:", Object.fromEntries(searchParams.entries()));
   console.log("📥 [NEXTAUTH] Method:", req.method);
   
+  // Résoudre les params si c'est une Promise (Next.js 15+)
+  let params: { nextauth: string[] };
+  try {
+    params = await Promise.resolve(context.params);
+    console.log("📥 [NEXTAUTH] Params résolus:", params);
+  } catch (error) {
+    console.error("❌ [NEXTAUTH] Erreur résolution params:", error);
+    // Extraire les params du pathname si la résolution échoue
+    const segments = pathname.replace("/api/auth/", "").split("/").filter(Boolean);
+    params = { nextauth: segments };
+    console.log("📥 [NEXTAUTH] Params extraits du pathname:", params);
+  }
+  
   // Logs spécifiques pour le callback Google
-  if (pathname.includes("/callback/google")) {
+  if (pathname.includes("/callback/google") || (params.nextauth?.includes("callback") && params.nextauth?.includes("google"))) {
     console.log("🔄 [NEXTAUTH] ========== CALLBACK GOOGLE DÉTECTÉ ==========");
     console.log("🔄 [NEXTAUTH] Code:", searchParams.get("code") ? "✅ Présent" : "❌ Manquant");
     console.log("🔄 [NEXTAUTH] Error:", searchParams.get("error") || "Aucune");
@@ -260,6 +276,8 @@ export async function GET(req: Request) {
   }
   
   try {
+    // NextAuth v4 extrait automatiquement les paramètres de l'URL
+    // Pas besoin d'adapter la requête
     const response = await handler(req);
     console.log("✅ [NEXTAUTH] GET response générée");
     console.log("✅ [NEXTAUTH] Status:", response.status);
@@ -290,7 +308,10 @@ export async function GET(req: Request) {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(
+  req: Request,
+  context: { params: Promise<{ nextauth: string[] }> | { nextauth: string[] } }
+) {
   const url = new URL(req.url);
   const pathname = url.pathname;
   
@@ -299,7 +320,21 @@ export async function POST(req: Request) {
   console.log("📥 [NEXTAUTH] Pathname:", pathname);
   console.log("📥 [NEXTAUTH] Method:", req.method);
   
+  // Résoudre les params si c'est une Promise (Next.js 15+)
+  let params: { nextauth: string[] };
   try {
+    params = await Promise.resolve(context.params);
+    console.log("📥 [NEXTAUTH] Params résolus:", params);
+  } catch (error) {
+    console.error("❌ [NEXTAUTH] Erreur résolution params:", error);
+    // Extraire les params du pathname si la résolution échoue
+    const segments = pathname.replace("/api/auth/", "").split("/").filter(Boolean);
+    params = { nextauth: segments };
+    console.log("📥 [NEXTAUTH] Params extraits du pathname:", params);
+  }
+  
+  try {
+    // NextAuth v4 extrait automatiquement les paramètres de l'URL
     const response = await handler(req);
     console.log("✅ [NEXTAUTH] POST response générée");
     console.log("✅ [NEXTAUTH] Status:", response.status);
