@@ -4,7 +4,7 @@
  */
 
 import prisma from "@/app/lib/prisma";
-import { Task } from "@prisma/client";
+import { Task, Routine, RoutineLog } from "@prisma/client";
 import { analyzeRecentPatterns } from "./tracker";
 
 export interface DetectedPattern {
@@ -150,10 +150,10 @@ async function detectFrequentRoutines(userId: string): Promise<DetectedPattern[]
     },
   });
 
-  routines.forEach((routine) => {
+  routines.forEach((routine: Routine & { logs: RoutineLog[] }) => {
     if (routine.logs.length >= 3) {
       // Analyser les heures d'exécution
-      const executionHours = routine.logs.map((log) => new Date(log.executedAt).getHours());
+      const executionHours = routine.logs.map((log: RoutineLog) => new Date(log.executedAt).getHours());
       const mostCommonHour = executionHours.reduce(
         (a, b, _, arr) => (arr.filter((v) => v === a).length >= arr.filter((v) => v === b).length ? a : b),
         executionHours[0]
