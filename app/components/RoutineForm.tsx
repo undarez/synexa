@@ -61,7 +61,7 @@ export function RoutineForm({
       setTriggerType(routine.triggerType);
       setTriggerData((routine.triggerData as Record<string, unknown>) || {});
       setSteps(
-        (routine.steps || []).map((step) => ({
+        (routine.steps || []).map((step: { id: string; order: number; actionType: string; payload?: unknown; deviceId?: string | null; delaySeconds?: number | null }) => ({
           id: step.id,
           actionType: step.actionType as any,
           payload: (step.payload as Record<string, unknown>) || {},
