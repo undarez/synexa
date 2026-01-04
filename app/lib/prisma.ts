@@ -18,6 +18,18 @@ if (!isDevelopment && globalForPrisma.prisma) {
           : ["error"],
     });
     
+    // Tester la connexion au démarrage
+    prismaInstance.$connect()
+      .then(() => {
+        console.log("✅ [Prisma] Connexion à Supabase réussie");
+      })
+      .catch((error) => {
+        console.error("❌ [Prisma] Erreur de connexion à Supabase:", error);
+        if (error.message.includes("DATABASE_URL")) {
+          console.error("💡 Vérifiez que DATABASE_URL est configuré dans les variables d'environnement");
+        }
+      });
+    
     if (!isDevelopment) {
       globalForPrisma.prisma = prismaInstance;
     }
