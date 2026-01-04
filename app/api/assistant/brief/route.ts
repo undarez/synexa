@@ -114,12 +114,12 @@ export async function GET() {
     ]);
 
     // Séparer les tâches
-    const highPriorityTasks = allTasks.filter((t) => t.priority === "HIGH");
+    const highPriorityTasks = allTasks.filter((t: Task) => t.priority === "HIGH");
     const todayTasks = allTasks.filter(
-      (t) => t.due && new Date(t.due) <= todayEnd && new Date(t.due) >= todayStart
+      (t: Task) => t.due && new Date(t.due) <= todayEnd && new Date(t.due) >= todayStart
     );
     const overdueTasks = allTasks.filter(
-      (t) => t.due && new Date(t.due) < todayStart
+      (t: Task) => t.due && new Date(t.due) < todayStart
     );
 
     // Récupérer la météo si on a une localisation
@@ -140,7 +140,7 @@ export async function GET() {
     };
 
     // Suggestions de trafic pour les événements avec lieu
-    const eventsWithLocation = events.filter((e) => e.location);
+    const eventsWithLocation = events.filter((e: CalendarEvent) => e.location);
     for (const event of eventsWithLocation.slice(0, 3)) {
       if (event.location && userData?.workAddress) {
         suggestions.traffic?.push({
@@ -153,7 +153,7 @@ export async function GET() {
     // Suggestions de routines basées sur l'heure
     const currentHour = now.getHours();
     const morningRoutines = routines.filter(
-      (r) => r.triggerType === "SCHEDULE" && r.name.toLowerCase().includes("matin")
+      (r: Routine) => r.triggerType === "SCHEDULE" && r.name.toLowerCase().includes("matin")
     );
     if (currentHour >= 6 && currentHour < 10 && morningRoutines.length > 0) {
       suggestions.routines?.push({
