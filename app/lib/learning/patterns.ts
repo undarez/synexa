@@ -4,6 +4,7 @@
  */
 
 import prisma from "@/app/lib/prisma";
+import { Task } from "@prisma/client";
 import { analyzeRecentPatterns } from "./tracker";
 
 export interface DetectedPattern {
@@ -99,7 +100,7 @@ async function detectRecurringTasks(userId: string): Promise<DetectedPattern[]> 
 
   // Grouper par titre similaire
   const titleGroups: Record<string, typeof tasks> = {};
-  tasks.forEach((task) => {
+  tasks.forEach((task: Task) => {
     const normalizedTitle = task.title.toLowerCase().trim();
     if (!titleGroups[normalizedTitle]) {
       titleGroups[normalizedTitle] = [];
