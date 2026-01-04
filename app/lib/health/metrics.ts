@@ -115,15 +115,16 @@ export async function getHealthMetricsSummary(
   const summaries: HealthMetricsSummary[] = [];
 
   for (const [type, typeMetrics] of Object.entries(grouped)) {
-    if (typeMetrics.length === 0) continue;
+    const typedMetrics = typeMetrics as HealthMetric[];
+    if (typedMetrics.length === 0) continue;
 
-    const latest = typeMetrics[0];
-    const values = typeMetrics.map((m) => m.value);
+    const latest = typedMetrics[0];
+    const values = typedMetrics.map((m) => m.value);
     const average = values.reduce((a, b) => a + b, 0) / values.length;
 
     // Calculer la tendance (comparer les 7 derniers jours avec les 7 précédents)
-    const recent = typeMetrics.slice(0, 7);
-    const previous = typeMetrics.slice(7, 14);
+    const recent = typedMetrics.slice(0, 7);
+    const previous = typedMetrics.slice(7, 14);
     let trend: "up" | "down" | "stable" = "stable";
 
     if (recent.length > 0 && previous.length > 0) {
@@ -150,7 +151,7 @@ export async function getHealthMetricsSummary(
         period: `${days} jours`,
       },
       trend,
-      count: typeMetrics.length,
+      count: typedMetrics.length,
     });
   }
 
