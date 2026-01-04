@@ -4,7 +4,7 @@
  */
 
 import prisma from "@/app/lib/prisma";
-import { Task, Routine, RoutineLog } from "@prisma/client";
+import { Task, Routine, RoutineLog, UserActivity } from "@prisma/client";
 import { analyzeRecentPatterns } from "./tracker";
 
 export interface DetectedPattern {
@@ -197,7 +197,7 @@ async function detectVoiceCommandPatterns(userId: string): Promise<DetectedPatte
 
   if (voiceActivities.length >= 5) {
     // Analyser les heures d'utilisation
-    const hours = voiceActivities.map((a) => {
+    const hours = voiceActivities.map((a: UserActivity) => {
       const metadata = a.metadata as any;
       return metadata?.hour ?? new Date(a.createdAt).getHours();
     });
