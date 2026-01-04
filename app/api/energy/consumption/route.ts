@@ -8,6 +8,7 @@ import {
   generateEnergyOptimizations,
 } from "@/app/lib/services/enedis-api";
 import { logger } from "@/app/lib/logger";
+import type { EnergyConsumption } from "@prisma/client";
 
 /**
  * GET - Récupère les données de consommation (Enedis ou SICEA)
@@ -292,7 +293,7 @@ export async function GET(request: NextRequest) {
       }
     } else {
       // Utiliser les données existantes
-      consumptionData = existingData.map((d) => ({
+      consumptionData = existingData.map((d: EnergyConsumption) => ({
         date: d.date.toISOString().split("T")[0],
         consumption: d.value,
         cost: d.cost || 0,
@@ -303,7 +304,7 @@ export async function GET(request: NextRequest) {
 
     // Si aucune donnée, utiliser les données existantes même si < 3
     if (consumptionData.length === 0 && existingData.length > 0) {
-      consumptionData = existingData.map((d) => ({
+      consumptionData = existingData.map((d: EnergyConsumption) => ({
         date: d.date.toISOString().split("T")[0],
         consumption: d.value,
         cost: d.cost || 0,

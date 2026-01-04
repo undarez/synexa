@@ -84,4 +84,3 @@ Si vous avez des données dans SQLite, vous devrez les migrer manuellement vers 
 
 - Assurez-vous que le schéma Prisma est à jour
 - Vérifiez que vous avez les permissions nécessaires sur la base de données
-
