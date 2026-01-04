@@ -114,7 +114,7 @@ export function TasksList({ tasks }: TasksListProps) {
       {/* Liste des tâches avec animations */}
       <div className="space-y-2">
         {activeTasks.slice(0, 5).map((task, index) => {
-          const ContextIcon = contextIcons[task.context];
+          const ContextIcon = contextIcons[task.context as TaskContext];
           const isOverdue = task.due && new Date(task.due) < new Date();
           
           return (
@@ -142,14 +142,14 @@ export function TasksList({ tasks }: TasksListProps) {
                   </h4>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
                     {/* Badge Priorité */}
-                    <Badge variant="outline" className={cn("text-xs px-1.5 py-0.5", priorityColors[task.priority])}>
+                    <Badge variant="outline" className={cn("text-xs px-1.5 py-0.5", priorityColors[task.priority as TaskPriority])}>
                       <AlertCircle className="h-2.5 w-2.5 mr-1" />
                       {task.priority === "HIGH" ? "Haute" : task.priority === "MEDIUM" ? "Moyenne" : "Basse"}
                     </Badge>
                     {/* Badge Contexte */}
                     <Badge variant="outline" className="text-xs px-1.5 py-0.5">
                       <ContextIcon className="h-2.5 w-2.5 mr-1" />
-                      {contextLabels[task.context]}
+                      {contextLabels[task.context as TaskContext]}
                     </Badge>
                     {/* Durée */}
                     {task.estimatedDuration && (
