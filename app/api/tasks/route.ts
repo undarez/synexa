@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/app/lib/prisma";
 import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
 import { trackActivity } from "@/app/lib/learning/tracker";
+import type { Task } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
     // Regroupement intelligent si demandé
     if (groupBy) {
       const grouped: Record<string, typeof tasks> = {};
-      tasks.forEach((task) => {
+      tasks.forEach((task: Task) => {
         let key = "";
         if (groupBy === "priority") {
           key = task.priority;
