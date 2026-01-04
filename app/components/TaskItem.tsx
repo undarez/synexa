@@ -51,7 +51,7 @@ const priorityLabels: Record<TaskPriority, string> = {
 
 export function TaskItem({ task, onEdit, onDelete, onToggleComplete }: TaskItemProps) {
   const isOverdue = task.due && new Date(task.due) < new Date() && !task.completed && !isToday(new Date(task.due));
-  const ContextIcon = contextIcons[task.context];
+  const ContextIcon = contextIcons[task.context as TaskContext];
 
   const handleToggleComplete = async () => {
     if (onToggleComplete) {
@@ -119,7 +119,7 @@ export function TaskItem({ task, onEdit, onDelete, onToggleComplete }: TaskItemP
           {/* Badge Contexte */}
           <span className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--muted))] px-2 py-0.5 text-xs font-medium text-[hsl(var(--foreground))]">
             <ContextIcon className="h-3 w-3" />
-            {contextLabels[task.context]}
+            {contextLabels[task.context as TaskContext]}
           </span>
 
           {/* Durée estimée */}
