@@ -26,7 +26,7 @@ Utilisez le mot de passe que vous avez défini lors de la création du projet Su
 Ouvrez votre fichier `.env` et ajoutez/modifiez cette ligne :
 
 ```env
-DATABASE_URL="postgresql://postgres:VOTRE_MOT_DE_PASSE_ICI@db.deamqbfsidcgrrxsfwuf.supabase.co:5432/postgres"
+DATABASE_URL="postgresql://postgres:OaEuothDUnRZSMdN@db.deamqbfsidcgrrxsfwuf.supabase.co:5432/postgres"
 ```
 
 **Remplacez `VOTRE_MOT_DE_PASSE_ICI` par votre vrai mot de passe.**

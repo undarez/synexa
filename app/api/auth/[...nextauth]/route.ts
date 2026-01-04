@@ -6,6 +6,11 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import prisma from "@/app/lib/prisma";
 import bcrypt from "bcrypt";
 
+// Vérifier que DATABASE_URL est configuré
+if (!process.env.DATABASE_URL) {
+  console.error("❌ [NEXTAUTH] DATABASE_URL n'est pas configuré!");
+}
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
@@ -96,7 +101,14 @@ export const authOptions: NextAuthOptions = {
         email: user?.email,
         provider: account?.provider,
         hasAccessToken: !!account?.access_token,
+        hasDatabaseUrl: !!process.env.DATABASE_URL,
       });
+      
+      // Vérifier que DATABASE_URL est configuré
+      if (!process.env.DATABASE_URL) {
+        console.error("❌ [NEXTAUTH] DATABASE_URL manquant - impossible de créer la session");
+        return false;
+      }
       
       // Vérifier que l'authentification Google a réussi
       if (account?.provider === "google") {
@@ -115,11 +127,15 @@ export const authOptions: NextAuthOptions = {
       console.log("👤 [NEXTAUTH] session callback (database):", {
         userId: user?.id,
         sessionUser: session.user?.email,
+        hasUser: !!user,
+        hasSession: !!session,
       });
       
       // Avec la stratégie database, user est directement disponible depuis la DB
       if (session.user && user) {
         session.user.id = user.id;
+      } else if (session.user && !user) {
+        console.warn("⚠️ [NEXTAUTH] Session sans user - possible problème de connexion DB");
       }
       
       return session;
@@ -144,6 +160,38 @@ export const authOptions: NextAuthOptions = {
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
+  events: {
+    async signIn({ user, account, isNewUser }) {
+      console.log("📝 [NEXTAUTH] Event signIn:", {
+        userId: user?.id,
+        email: user?.email,
+        isNewUser,
+        provider: account?.provider,
+      });
+    },
+    async createUser({ user }) {
+      console.log("➕ [NEXTAUTH] Event createUser:", {
+        userId: user.id,
+        email: user.email,
+      });
+    },
+    async linkAccount({ user, account }) {
+      console.log("🔗 [NEXTAUTH] Event linkAccount:", {
+        userId: user.id,
+        provider: account.provider,
+      });
+    },
+    async session({ session, token }) {
+      console.log("📋 [NEXTAUTH] Event session:", {
+        userEmail: session.user?.email,
+        hasToken: !!token,
+      });
+    },
+    async signOut({ session, token }) {
+      console.log("🚪 [NEXTAUTH] Event signOut");
+    },
+  },
+  debug: process.env.NODE_ENV === "development",
 };
 
 const handler = NextAuth(authOptions);
