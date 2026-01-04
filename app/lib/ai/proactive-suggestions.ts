@@ -7,6 +7,7 @@ import prisma from "@/app/lib/prisma";
 import { analyzeRecentPatterns } from "@/app/lib/learning/tracker";
 import { detectPatterns } from "@/app/lib/learning/patterns";
 import { getPersonalizedRecommendations } from "@/app/lib/learning/recommendations";
+import type { Task } from "@prisma/client";
 
 export interface ProactiveSuggestion {
   id: string;
@@ -55,7 +56,7 @@ export async function generateProactiveSuggestions(
     });
 
     if (overdueTasks.length > 0) {
-      const highPriorityOverdue = overdueTasks.filter((t) => t.priority === "HIGH");
+      const highPriorityOverdue = overdueTasks.filter((t: Task) => t.priority === "HIGH");
       if (highPriorityOverdue.length > 0) {
         suggestions.push({
           id: `overdue-${highPriorityOverdue[0].id}`,
@@ -95,7 +96,7 @@ export async function generateProactiveSuggestions(
     });
 
       if (todayTasks.length > 0) {
-      const completionRate = todayTasks.filter((t) => t.completed).length / todayTasks.length;
+      const completionRate = todayTasks.filter((t: Task) => t.completed).length / todayTasks.length;
       if (completionRate < 0.5 && currentHour >= 14) {
         suggestions.push({
           id: `today-tasks-${now.toISOString()}`,
