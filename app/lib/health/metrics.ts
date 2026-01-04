@@ -3,7 +3,7 @@
  */
 
 import prisma from "@/app/lib/prisma";
-import { HealthMetricType } from "@prisma/client";
+import { HealthMetricType, HealthMetric } from "@prisma/client";
 
 export interface HealthMetricInput {
   type: HealthMetricType;
@@ -104,7 +104,7 @@ export async function getHealthMetricsSummary(
   });
 
   // Grouper par type
-  const grouped = metrics.reduce((acc: Record<string, typeof metrics>, metric) => {
+  const grouped = metrics.reduce((acc: Record<string, typeof metrics>, metric: HealthMetric) => {
     if (!acc[metric.type]) {
       acc[metric.type] = [];
     }
