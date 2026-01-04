@@ -110,10 +110,10 @@ export function TaskItem({ task, onEdit, onDelete, onToggleComplete }: TaskItemP
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {/* Badge Priorité */}
           <span
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${priorityColors[task.priority]}`}
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${priorityColors[task.priority as TaskPriority]}`}
           >
             <AlertCircle className="h-3 w-3" />
-            {priorityLabels[task.priority]}
+            {priorityLabels[task.priority as TaskPriority]}
           </span>
 
           {/* Badge Contexte */}
