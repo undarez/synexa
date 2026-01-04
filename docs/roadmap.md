@@ -22,7 +22,7 @@
 
 - **Front** : Next.js App Router, server actions, UI multi-device (desktop, mobile web).
 - **Auth** : NextAuth + Prisma + OAuth (Google, Facebook) + credentials (bcrypt). MFA ultérieurement.
-- **Données** : Prisma sur SQLite dev, Postgres prod. Modèles prévus : `User`, `Task`, `Routine`, `Device`, `CalendarEvent`, `Preference`, `HealthMetric`.
+- **Données** : Prisma sur PostgreSQL (Supabase) en production. Modèles prévus : `User`, `Task`, `Routine`, `Device`, `CalendarEvent`, `Preference`, `HealthMetric`.
 - **IA/NLP** :
   - Interpréteur commandes (LangChain / OpenAI Realtime à terme).
   - Module de planification (priorisation tasks, suggestions routines).

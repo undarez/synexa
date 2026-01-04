@@ -19,14 +19,14 @@ async function main() {
     
     console.log("✅ Migration appliquée avec succès!\n");
     
-    // Vérifie que les tables existent
-    const tables = await prisma.$queryRaw<Array<{ name: string }>>`
-      SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;
+    // Vérifie que les tables existent (PostgreSQL)
+    const tables = await prisma.$queryRaw<Array<{ tablename: string }>>`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;
     `;
     
     console.log("📋 Tables créées:");
     tables.forEach(table => {
-      console.log(`   ✅ ${table.name}`);
+      console.log(`   ✅ ${table.tablename}`);
     });
     
     console.log("\n✅ Base de données configurée avec succès!");

@@ -10,7 +10,7 @@ Ces variables doivent être configurées pour que l'application démarre correct
 |----------|-------------|------------------|
 | `NEXTAUTH_URL` | URL de base de l'application | `http://localhost:3000` en dev, votre domaine en prod |
 | `NEXTAUTH_SECRET` | Secret pour signer les tokens JWT | `openssl rand -base64 32` ou [générateur](https://generate-secret.vercel.app/32) |
-| `DATABASE_URL` | URL de connexion à la base de données | `"file:./dev.db"` pour SQLite, ou URL PostgreSQL/MySQL |
+| `DATABASE_URL` | URL de connexion PostgreSQL (Supabase) | `postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres` |
 | `ENCRYPTION_KEY` | Clé de chiffrement pour les données sensibles | `npx tsx scripts/generate-encryption-key.ts` |
 | `CRON_SECRET` | Secret pour sécuriser les endpoints cron | `openssl rand -base64 32` ou [générateur](https://generate-secret.vercel.app/32) |
 

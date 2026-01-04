@@ -56,7 +56,7 @@ Dans la section **"Environment Variables"**, ajoutez **TOUTES** les variables de
 #### Variables obligatoires :
 
 ```env
-DATABASE_URL=file:./prisma/dev.db
+DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
 NEXTAUTH_URL=https://votre-projet.vercel.app
 NEXTAUTH_SECRET=votre_secret_nextauth
 CRON_SECRET=votre_secret_cron
@@ -108,12 +108,16 @@ Les cron jobs sont automatiquement configurés via `vercel.json` :
 
 ### 3.3 Base de données
 
-**SQLite en local :** Fonctionne mais pas recommandé pour la production.
+**PostgreSQL (Supabase) :** Base de données utilisée en production.
 
-**Pour la production, utilisez :**
+**Configuration :**
+- Utilisez Supabase (gratuit, PostgreSQL) : [supabase.com](https://supabase.com)
+- Configurez `DATABASE_URL` avec votre connection string Supabase
+- Format : `postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres`
+
+**Alternatives :**
 - **Vercel Postgres** (recommandé, intégré)
 - **PlanetScale** (gratuit, MySQL)
-- **Supabase** (gratuit, PostgreSQL)
 - **Railway** (gratuit, PostgreSQL)
 
 **Migration vers PostgreSQL :**

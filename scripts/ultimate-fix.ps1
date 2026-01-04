@@ -54,7 +54,7 @@ Write-Host "[4/6] Verification de la table Reminder dans la base..." -Foreground
 $checkScript = @'
 import { PrismaClient } from '@prisma/client';
 const p = new PrismaClient();
-p.$queryRaw`SELECT name FROM sqlite_master WHERE type='table' AND name='Reminder'`.then((tables: any) => {
+p.$queryRaw`SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'Reminder'`.then((tables: any) => {
   if (tables.length > 0) {
     console.log('OK - Table Reminder EXISTE dans la base');
     p.$disconnect();

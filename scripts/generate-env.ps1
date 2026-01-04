@@ -16,8 +16,9 @@ ACCESS_TOKEN_SECRET=
 # ============================================
 # 🗄️ BASE DE DONNÉES (Obligatoire)
 # ============================================
-# Chemin vers la base de données SQLite (dev) ou URL PostgreSQL/MySQL (prod)
-DATABASE_URL="file:./dev.db"
+# URL de connexion PostgreSQL (Supabase)
+# Format: postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
+DATABASE_URL="postgresql://postgres:OaEuothDUnRZSMdN@db.deamqbfsidcgrrxsfwuf.supabase.co:5432/postgres"
 
 # ============================================
 # 🔐 CHIFFREMENT DES DONNÉES (Obligatoire)

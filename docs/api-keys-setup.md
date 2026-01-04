@@ -19,14 +19,18 @@ NEXTAUTH_SECRET=votre_secret_aleatoire_ici
 
 ---
 
-### 🗄️ Base de données (Prisma/SQLite)
+### 🗄️ Base de données (Prisma/PostgreSQL - Supabase)
 
 ```env
-# Chemin vers la base de données SQLite
-DATABASE_URL="file:./dev.db"
+# URL de connexion PostgreSQL (Supabase)
+DATABASE_URL="postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres"
 ```
 
-**Note :** En production, vous pouvez utiliser PostgreSQL ou MySQL en changeant cette URL.
+**Configuration :**
+1. Créez un projet sur [supabase.com](https://supabase.com)
+2. Récupérez la connection string dans **Settings** → **Database** → **Connection string** → **URI**
+3. Remplacez `[PASSWORD]` par votre mot de passe Supabase
+4. Remplacez `[PROJECT_REF]` par votre Project ID Supabase
 
 ---
 
@@ -266,7 +270,7 @@ NEXTAUTH_SECRET=votre_secret_aleatoire_ici
 # ============================================
 # 🗄️ BASE DE DONNÉES
 # ============================================
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres"
 
 # ============================================
 # 📧 EMAIL (Resend)
@@ -364,7 +368,7 @@ CRON_SECRET=votre_secret_aleatoire_ici
 ```env
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=$(openssl rand -base64 32)
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres"
 ```
 
 ### 2. Ajouter les notifications

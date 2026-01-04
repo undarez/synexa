@@ -7,25 +7,10 @@ import { PrismaClient } from "@prisma/client";
 config({ path: resolve(__dirname, "../.env") });
 config({ path: resolve(__dirname, "../.env.local") });
 
-// Corrige le chemin DATABASE_URL pour qu'il soit absolu
-let databaseUrl = process.env.DATABASE_URL;
-if (databaseUrl?.startsWith("file:")) {
-  const projectRoot = resolve(__dirname, "..");
-  const dbPath = databaseUrl.replace(/^file:\.?\//, "");
-  const absolutePath = join(projectRoot, dbPath);
-  databaseUrl = `file:${absolutePath}`;
-  process.env.DATABASE_URL = databaseUrl;
-}
+// Vérifie que DATABASE_URL est configuré (PostgreSQL)
+const databaseUrl = process.env.DATABASE_URL;
 
-const prisma = new PrismaClient({
-  datasources: databaseUrl
-    ? {
-        db: {
-          url: databaseUrl,
-        },
-      }
-    : undefined,
-});
+const prisma = new PrismaClient();
 
 async function main() {
   console.log("🔧 Vérification de la base de données...");
@@ -33,7 +18,15 @@ async function main() {
   
   if (!process.env.DATABASE_URL) {
     console.error("❌ DATABASE_URL n'est pas défini dans .env ou .env.local");
-    console.log("💡 Assurez-vous d'avoir DATABASE_URL=\"file:./prisma/dev.db\" dans votre .env");
+    console.log("💡 Assurez-vous d'avoir DATABASE_URL configuré avec votre connection string PostgreSQL (Supabase)");
+    console.log("   Format: postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres");
+    process.exit(1);
+  }
+  
+  // Vérifier que c'est une URL PostgreSQL
+  if (!databaseUrl?.startsWith("postgresql://") && !databaseUrl?.startsWith("postgres://")) {
+    console.error("❌ DATABASE_URL doit être une URL PostgreSQL");
+    console.log("💡 Format attendu: postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres");
     process.exit(1);
   }
   
@@ -50,13 +43,13 @@ async function main() {
       console.log("   ou");
       console.log("   npx prisma db push");
       process.exit(1);
-    } else if (error.message?.includes("Unable to open the database file") || error.code === "P1001") {
-      console.log("❌ Impossible d'ouvrir le fichier de base de données.");
-      console.log(`📁 Chemin attendu: ${databaseUrl?.replace("file:", "")}`);
+    } else if (error.code === "P1001" || error.message?.includes("Can't reach database server")) {
+      console.log("❌ Impossible de se connecter à la base de données PostgreSQL.");
       console.log("\n💡 Vérifiez que:");
-      console.log("   1. Le fichier existe et est accessible");
-      console.log("   2. Le chemin dans DATABASE_URL est correct");
-      console.log("   3. Vous avez les permissions nécessaires");
+      console.log("   1. DATABASE_URL est correct (format PostgreSQL)");
+      console.log("   2. Le mot de passe dans DATABASE_URL est correct");
+      console.log("   3. Supabase est accessible et la base de données existe");
+      console.log("   4. Les politiques RLS sont désactivées sur les tables NextAuth");
       process.exit(1);
     } else {
       console.error("❌ Erreur:", error.message);
