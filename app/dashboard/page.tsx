@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { startOfDay, endOfDay } from "date-fns";
 import prisma from "@/app/lib/prisma";
+import type { Routine } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
 import { Navigation } from "@/app/components/Navigation";
@@ -78,7 +79,7 @@ async function getDashboardData(userId: string) {
     return {
       agenda: events,
       tasks,
-      activeRoutines: routines.map((routine) => ({
+      activeRoutines: routines.map((routine: Routine) => ({
         id: routine.id,
         name: routine.name,
         triggerType: routine.triggerType,
