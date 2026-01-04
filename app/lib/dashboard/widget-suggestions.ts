@@ -25,7 +25,7 @@ export async function getWidgetSuggestions(userId: string): Promise<WidgetSugges
       select: { widgetType: true },
     });
 
-    const visibleWidgetTypes = new Set(currentWidgets.map((w) => w.widgetType));
+    const visibleWidgetTypes = new Set(currentWidgets.map((w: { widgetType: string }) => w.widgetType as WidgetType));
 
     // Analyser les activités récentes
     const recentActivities = await prisma.userActivity.findMany({
