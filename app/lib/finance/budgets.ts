@@ -1,5 +1,5 @@
 import prisma from "@/app/lib/prisma";
-import { ExpenseCategory } from "@prisma/client";
+import { ExpenseCategory, Budget } from "@prisma/client";
 
 export interface CreateBudgetInput {
   userId: string;
@@ -198,7 +198,7 @@ export async function getBudgetSummary(budgetId: string, userId: string) {
 export async function getAllBudgetSummaries(userId: string) {
   const budgets = await getUserBudgets(userId, true);
   const summaries = await Promise.all(
-    budgets.map((budget) => getBudgetSummary(budget.id, userId))
+    budgets.map((budget: Budget) => getBudgetSummary(budget.id, userId))
   );
   return summaries.filter((s) => s !== null);
 }
