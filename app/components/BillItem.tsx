@@ -62,8 +62,8 @@ export default function BillItem({ bill, onUpdate }: BillItemProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isMarkingPaid, setIsMarkingPaid] = useState(false);
 
-  const category = categoryLabels[bill.category];
-  const status = statusLabels[bill.status];
+  const category = categoryLabels[bill.category as BillCategory] || categoryLabels.OTHER;
+  const status = statusLabels[bill.status as BillStatus] || statusLabels.PENDING;
   const CategoryIcon = category.icon;
   const StatusIcon = status.icon;
 
