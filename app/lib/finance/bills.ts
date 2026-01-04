@@ -295,7 +295,7 @@ export async function getFinancialSummary(userId: string, month?: number, year?:
     totalPending: totalPending._sum.amount || 0,
     totalPaid: totalPaid._sum.amount || 0,
     totalOverdue: totalOverdue._sum.amount || 0,
-    byCategory: billsByCategory.map((item) => ({
+    byCategory: billsByCategory.map((item: { category: string; _sum: { amount: number | null }; _count: number }) => ({
       category: item.category,
       total: item._sum.amount || 0,
       count: item._count,
