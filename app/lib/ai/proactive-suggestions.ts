@@ -7,7 +7,7 @@ import prisma from "@/app/lib/prisma";
 import { analyzeRecentPatterns } from "@/app/lib/learning/tracker";
 import { detectPatterns } from "@/app/lib/learning/patterns";
 import { getPersonalizedRecommendations } from "@/app/lib/learning/recommendations";
-import type { Task } from "@prisma/client";
+import type { Task, RoutineLog } from "@prisma/client";
 
 export interface ProactiveSuggestion {
   id: string;
@@ -170,7 +170,7 @@ export async function generateProactiveSuggestions(
 
       for (const routine of routines) {
       if (routine.logs.length >= 3) {
-        const executionHours = routine.logs.map((log) => new Date(log.executedAt).getHours());
+        const executionHours = routine.logs.map((log: RoutineLog) => new Date(log.executedAt).getHours());
         const mostCommonHour = executionHours.reduce(
           (a, b, _, arr) => (arr.filter((v) => v === a).length >= arr.filter((v) => v === b).length ? a : b),
           executionHours[0]
