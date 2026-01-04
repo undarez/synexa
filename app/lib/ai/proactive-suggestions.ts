@@ -172,7 +172,7 @@ export async function generateProactiveSuggestions(
       if (routine.logs.length >= 3) {
         const executionHours = routine.logs.map((log: RoutineLog) => new Date(log.executedAt).getHours());
         const mostCommonHour = executionHours.reduce(
-          (a, b, _, arr) => (arr.filter((v) => v === a).length >= arr.filter((v) => v === b).length ? a : b),
+          (a: number, b: number, _: number, arr: number[]) => (arr.filter((v: number) => v === a).length >= arr.filter((v: number) => v === b).length ? a : b),
           executionHours[0]
         );
 
