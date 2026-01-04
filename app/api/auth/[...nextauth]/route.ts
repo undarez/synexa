@@ -7,9 +7,7 @@ import prisma from "@/app/lib/prisma";
 import bcrypt from "bcrypt";
 
 export const authOptions: NextAuthOptions = {
-  // DÉSACTIVER PrismaAdapter temporairement pour tester
-  // Si ça fonctionne sans adapter, le problème vient de Prisma/DB
-  // adapter: PrismaAdapter(prisma),
+  adapter: PrismaAdapter(prisma),
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -97,60 +95,26 @@ export const authOptions: NextAuthOptions = {
         hasAccessToken: !!account?.access_token,
       });
       
-      // Autoriser toutes les connexions OAuth
-      if (account?.provider === "google" || account?.provider === "facebook") {
-        // Essayer de créer/lier l'utilisateur dans Prisma manuellement
-        try {
-          if (user?.email) {
-            const existingUser = await prisma.user.findUnique({
-              where: { email: user.email },
-            });
-            
-            if (!existingUser) {
-              // Créer l'utilisateur
-              const newUser = await prisma.user.create({
-                data: {
-                  email: user.email,
-                  name: user.name,
-                  image: user.image,
-                },
-              });
-              console.log("✅ [NEXTAUTH] Utilisateur créé:", newUser.id);
-              
-              // Créer le compte OAuth
-              if (account) {
-                await prisma.account.create({
-                  data: {
-                    userId: newUser.id,
-                    type: account.type,
-                    provider: account.provider,
-                    providerAccountId: account.providerAccountId,
-                    access_token: account.access_token,
-                    refresh_token: account.refresh_token,
-                    expires_at: account.expires_at,
-                    token_type: account.token_type,
-                    scope: account.scope,
-                    id_token: account.id_token,
-                    session_state: account.session_state,
-                  },
-                });
-                console.log("✅ [NEXTAUTH] Compte OAuth créé");
-              }
-            } else {
-              console.log("✅ [NEXTAUTH] Utilisateur existant trouvé:", existingUser.id);
-            }
-          }
-        } catch (error) {
-          console.error("❌ [NEXTAUTH] Erreur lors de la création de l'utilisateur:", error);
-          // Continuer quand même - la session JWT fonctionnera sans DB
+      // Vérifier que l'authentification Google a réussi
+      if (account?.provider === "google") {
+        if (!account.access_token) {
+          console.error("❌ [NEXTAUTH] Google access_token manquant");
+          return false;
         }
-        
-        return true;
+        console.log("✅ [NEXTAUTH] Google signIn autorisé");
       }
+      
       return true;
     },
     async jwt({ token, user, account, trigger }) {
-      // Lors de la première connexion
+      console.log("🎫 [NEXTAUTH] jwt callback:", {
+        trigger,
+        hasUser: !!user,
+        hasAccount: !!account,
+        tokenSub: token.sub,
+      });
+      
+      // Lors de la première connexion, utiliser l'ID de l'utilisateur créé par PrismaAdapter
       if (user) {
         token.sub = user.id;
         token.email = user.email;
@@ -167,6 +131,12 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
+      console.log("👤 [NEXTAUTH] session callback:", {
+        hasToken: !!token,
+        tokenSub: token.sub,
+        sessionUser: session.user?.email,
+      });
+      
       if (session.user && token.sub) {
         session.user.id = token.sub;
       }
