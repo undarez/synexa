@@ -238,7 +238,7 @@ export async function getExpensesByCategory(userId: string, month?: number, year
     _count: true,
   });
 
-  return expenses.map((item) => ({
+  return expenses.map((item: { category: string; _sum: { amount: number | null }; _count: number }) => ({
     category: item.category,
     total: item._sum.amount || 0,
     count: item._count,
