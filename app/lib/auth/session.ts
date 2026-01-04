@@ -29,7 +29,7 @@ export class UserNotFoundError extends Error {
 
 /**
  * Récupère l'utilisateur actuel depuis la session
- * Crée l'utilisateur dans la base de données s'il n'existe pas encore
+ * Avec la stratégie "database", PrismaAdapter gère automatiquement les utilisateurs
  */
 export async function getCurrentUser(): Promise<SessionUser | null> {
   try {
@@ -41,46 +41,14 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
 
     const userId = session.user.id;
 
-    // Vérifier que l'utilisateur existe dans la base de données
-    let user = await prisma.user.findUnique({
+    // Avec strategy: "database", l'utilisateur est toujours dans la DB (géré par PrismaAdapter)
+    const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, name: true, email: true, image: true },
     });
 
-    // Si l'utilisateur n'existe pas, le créer depuis la session
-    if (!user && session.user) {
-      try {
-        user = await prisma.user.create({
-          data: {
-            id: userId,
-            name: session.user.name || null,
-            email: session.user.email || null,
-            image: session.user.image || null,
-          },
-          select: { id: true, name: true, email: true, image: true },
-        });
-        console.log("[getCurrentUser] Utilisateur créé automatiquement:", userId);
-      } catch (error: any) {
-        // Si l'erreur est due à un email déjà existant, essayer de récupérer l'utilisateur
-        if (error?.code === "P2002" && session.user.email) {
-          user = await prisma.user.findUnique({
-            where: { email: session.user.email },
-            select: { id: true, name: true, email: true, image: true },
-          });
-        } else {
-          console.error("[getCurrentUser] Erreur lors de la création:", error);
-          // Retourner les données de session même si la création échoue
-          return {
-            id: userId,
-            name: session.user.name || null,
-            email: session.user.email || null,
-            image: session.user.image || null,
-          };
-        }
-      }
-    }
-
     if (!user) {
+      console.warn("[getCurrentUser] Utilisateur non trouvé dans la DB:", userId);
       // Fallback: retourner les données de session
       return {
         id: userId,

@@ -54,8 +54,9 @@ export const authOptions: NextAuthOptions = {
     signIn: "/auth/signin",
   },
   session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60,
+    strategy: "database", // Stratégie recommandée avec PrismaAdapter selon la documentation officielle
+    maxAge: 30 * 24 * 60 * 60, // 30 jours
+    updateAge: 24 * 60 * 60, // Mettre à jour la session toutes les 24h
   },
   cookies: {
     sessionToken: {
@@ -106,44 +107,18 @@ export const authOptions: NextAuthOptions = {
       
       return true;
     },
-    async jwt({ token, user, account, trigger }) {
-      console.log("🎫 [NEXTAUTH] jwt callback:", {
-        trigger,
-        hasUser: !!user,
-        hasAccount: !!account,
-        tokenSub: token.sub,
-      });
-      
-      // Lors de la première connexion, utiliser l'ID de l'utilisateur créé par PrismaAdapter
-      if (user) {
-        token.sub = user.id;
-        token.email = user.email;
-        token.name = user.name;
-        token.picture = user.image;
-      }
-      // Stocker les tokens OAuth
-      if (account) {
-        token.accessToken = account.access_token;
-        token.refreshToken = account.refresh_token;
-        token.expiresAt = account.expires_at;
-        token.provider = account.provider;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      console.log("👤 [NEXTAUTH] session callback:", {
-        hasToken: !!token,
-        tokenSub: token.sub,
+    // Avec strategy: "database", le callback session reçoit { session, user } au lieu de { session, token }
+    async session({ session, user }) {
+      console.log("👤 [NEXTAUTH] session callback (database):", {
+        userId: user?.id,
         sessionUser: session.user?.email,
       });
       
-      if (session.user && token.sub) {
-        session.user.id = token.sub;
+      // Avec la stratégie database, user est directement disponible
+      if (session.user && user) {
+        session.user.id = user.id;
       }
-      // Ajouter les tokens OAuth à la session si nécessaire
-      if (token.accessToken) {
-        (session as any).accessToken = token.accessToken;
-      }
+      
       return session;
     },
     async redirect({ url, baseUrl }) {

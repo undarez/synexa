@@ -1,6 +1,6 @@
 // Service Worker pour PWA et notifications push
 // Version corrigée pour éviter les conflits avec NextAuth OAuth
-const CACHE_NAME = "synexa-v2"; // Version incrémentée pour forcer la mise à jour
+const CACHE_NAME = "synexa-v3"; // Version incrémentée pour forcer la mise à jour (v3: fix NextAuth session)
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -58,6 +58,27 @@ self.addEventListener("activate", (event) => {
             return caches.delete(name);
           })
       );
+    }).then(() => {
+      // Supprimer aussi toutes les entrées de cache pour les routes NextAuth
+      // pour éviter de servir d'anciennes réponses mises en cache
+      return caches.open(CACHE_NAME).then((cache) => {
+        return cache.keys().then((keys) => {
+          const nextAuthKeys = keys.filter((request) => {
+            try {
+              const url = new URL(request.url);
+              return url.pathname.startsWith("/api/auth/");
+            } catch {
+              return false;
+            }
+          });
+          return Promise.all(
+            nextAuthKeys.map((key) => {
+              console.log("[SW] Suppression cache NextAuth:", key.url);
+              return cache.delete(key);
+            })
+          );
+        });
+      });
     })
   );
   // Retarder clients.claim() pour éviter de prendre le contrôle trop tôt
@@ -74,19 +95,25 @@ self.addEventListener("activate", (event) => {
 // Cache strategy: Network first, fallback to cache (sauf pour routes critiques)
 self.addEventListener("fetch", (event) => {
   const { request } = event;
-  
-  // Ignorer complètement les requêtes non-GET
-  if (request.method !== "GET") {
-    return;
-  }
 
   try {
     const url = new URL(request.url);
 
-    // IGNORER COMPLÈTEMENT les routes NextAuth - ne pas les intercepter du tout
+    // IGNORER COMPLÈTEMENT les routes NextAuth - NE PAS les intercepter
+    // Selon la documentation officielle NextAuth.js, les routes /api/auth/* ne doivent
+    // JAMAIS être interceptées par le Service Worker pour garantir le bon fonctionnement
+    // de l'authentification. Ne pas appeler event.respondWith() = la requête passe
+    // directement au réseau sans aucune intervention du SW.
     if (url.pathname.startsWith("/api/auth/")) {
-      console.log("[SW] Route NextAuth ignorée:", url.pathname);
-      return; // Ne pas intercepter, laisser passer directement
+      console.log("[SW] Route NextAuth ignorée (pas d'interception):", url.pathname, request.method);
+      // Ne pas appeler event.respondWith() = la requête passe directement au réseau
+      // C'est la méthode recommandée par la documentation officielle NextAuth.js
+      return;
+    }
+
+    // Ignorer complètement les requêtes non-GET (sauf pour NextAuth qui est déjà géré ci-dessus)
+    if (request.method !== "GET") {
+      return;
     }
 
     // Vérifier AVANT d'intercepter si on doit ignorer cette requête
