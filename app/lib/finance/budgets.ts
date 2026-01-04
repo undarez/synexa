@@ -200,6 +200,6 @@ export async function getAllBudgetSummaries(userId: string) {
   const summaries = await Promise.all(
     budgets.map((budget: Budget) => getBudgetSummary(budget.id, userId))
   );
-  return summaries.filter((s) => s !== null);
+  return summaries.filter((s: Awaited<ReturnType<typeof getBudgetSummary>> | null) => s !== null);
 }
 
