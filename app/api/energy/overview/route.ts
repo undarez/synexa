@@ -3,6 +3,7 @@ import { requireUser } from "@/app/lib/auth/session";
 import prisma from "@/app/lib/prisma";
 import { calculateConsumptionStats } from "@/app/lib/services/enedis-api";
 import { logger } from "@/app/lib/logger";
+import type { EnergyConsumption } from "@prisma/client";
 
 /**
  * GET /api/energy/overview
@@ -51,10 +52,10 @@ export async function GET(request: NextRequest) {
     });
 
     // Calculer les totaux
-    const currentMonthTotal = currentMonthData.reduce((sum, d) => sum + d.value, 0);
-    const currentMonthCost = currentMonthData.reduce((sum, d) => sum + (d.cost || 0), 0);
+    const currentMonthTotal = currentMonthData.reduce((sum: number, d: EnergyConsumption) => sum + d.value, 0);
+    const currentMonthCost = currentMonthData.reduce((sum: number, d: EnergyConsumption) => sum + (d.cost || 0), 0);
     
-    const previousMonthTotal = previousMonthData.reduce((sum, d) => sum + d.value, 0);
+    const previousMonthTotal = previousMonthData.reduce((sum: number, d: EnergyConsumption) => sum + d.value, 0);
     
     // Calculer la tendance
     const trend = previousMonthTotal > 0
@@ -74,7 +75,7 @@ export async function GET(request: NextRequest) {
       orderBy: { date: "asc" },
     });
 
-    const history = historyData.map((d) => ({
+    const history = historyData.map((d: EnergyConsumption) => ({
       date: d.date.toISOString().split("T")[0],
       value: d.value,
     }));
