@@ -54,7 +54,9 @@ export const authOptions: NextAuthOptions = {
     signIn: "/auth/signin",
   },
   session: {
-    strategy: "database", // Stratégie recommandée avec PrismaAdapter selon la documentation officielle
+    // Stratégie "database" recommandée avec PrismaAdapter selon la documentation officielle
+    // Les sessions sont stockées dans Supabase (PostgreSQL)
+    strategy: "database",
     maxAge: 30 * 24 * 60 * 60, // 30 jours
     updateAge: 24 * 60 * 60, // Mettre à jour la session toutes les 24h
   },
@@ -108,13 +110,14 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
     // Avec strategy: "database", le callback session reçoit { session, user } au lieu de { session, token }
+    // Le callback jwt n'est pas utilisé avec la stratégie database
     async session({ session, user }) {
       console.log("👤 [NEXTAUTH] session callback (database):", {
         userId: user?.id,
         sessionUser: session.user?.email,
       });
       
-      // Avec la stratégie database, user est directement disponible
+      // Avec la stratégie database, user est directement disponible depuis la DB
       if (session.user && user) {
         session.user.id = user.id;
       }
