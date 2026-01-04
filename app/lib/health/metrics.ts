@@ -104,7 +104,7 @@ export async function getHealthMetricsSummary(
   });
 
   // Grouper par type
-  const grouped = metrics.reduce((acc, metric) => {
+  const grouped = metrics.reduce((acc: Record<string, typeof metrics>, metric) => {
     if (!acc[metric.type]) {
       acc[metric.type] = [];
     }
