@@ -52,8 +52,8 @@ const categoryLabels: Record<ExpenseCategory, { label: string; icon: any }> = {
 
 export default function BudgetCard({ summary, onEdit, onDelete }: BudgetCardProps) {
   const { budget, spent, remaining, percentage, isOverBudget, shouldAlert } = summary;
-  const CategoryIcon = categoryLabels[budget.category]?.icon || MoreHorizontal;
-  const categoryLabel = categoryLabels[budget.category]?.label || "Autre";
+  const CategoryIcon = categoryLabels[budget.category as ExpenseCategory]?.icon || MoreHorizontal;
+  const categoryLabel = categoryLabels[budget.category as ExpenseCategory]?.label || "Autre";
 
   return (
     <Card className={isOverBudget ? "border-red-500" : shouldAlert ? "border-yellow-500" : ""}>
