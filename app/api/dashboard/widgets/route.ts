@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import prisma from "@/app/lib/prisma";
-import { getDefaultWidgets } from "@/app/lib/dashboard/widgets";
+import { getDefaultWidgets, type WidgetConfig } from "@/app/lib/dashboard/widgets";
+import type { DashboardWidget } from "@prisma/client";
 
 /**
  * GET /api/dashboard/widgets
@@ -59,12 +60,12 @@ export async function GET(request: NextRequest) {
     
     // S'assurer que tous les widgets par défaut existent (pour les utilisateurs existants)
     const defaultWidgets = getDefaultWidgets();
-    const existingWidgetTypes = new Set(widgets.map(w => w.widgetType));
-    const missingWidgets = defaultWidgets.filter(w => !existingWidgetTypes.has(w.widgetType));
+    const existingWidgetTypes = new Set(widgets.map((w: DashboardWidget) => w.widgetType));
+    const missingWidgets = defaultWidgets.filter((w: WidgetConfig) => !existingWidgetTypes.has(w.widgetType));
     
     if (missingWidgets.length > 0) {
       const createdWidgets = await Promise.all(
-        missingWidgets.map((widget) =>
+        missingWidgets.map((widget: WidgetConfig) =>
           prisma.dashboardWidget.create({
             data: {
               userId,
