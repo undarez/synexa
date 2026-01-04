@@ -111,7 +111,7 @@ async function detectRecurringTasks(userId: string): Promise<DetectedPattern[]> 
   // Identifier les tâches récurrentes (créées au moins 3 fois)
   Object.entries(titleGroups).forEach(([title, group]) => {
     if (group.length >= 3) {
-      const avgDuration = group.reduce((sum, t) => sum + (t.estimatedDuration || 0), 0) / group.length;
+      const avgDuration = group.reduce((sum: number, t: Task) => sum + (t.estimatedDuration || 0), 0) / group.length;
       patterns.push({
         category: "task",
         pattern: `recurring_task:${title}`,
