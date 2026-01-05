@@ -29,12 +29,12 @@ if (!isDevelopment && globalForPrisma.prisma) {
     const accelerateUrl = dbUrl.replace(/^(postgresql|postgres):\/\//, "prisma+postgres://");
 
     prismaInstance = new PrismaClient({
-      accelerateUrl,
+      accelerateUrl: accelerateUrl as any,
       log:
         isDevelopment
           ? ["query", "error", "warn"]
           : ["error"],
-    });
+    } as any);
     
     // Tester la connexion au démarrage
     prismaInstance.$connect()
