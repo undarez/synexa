@@ -103,7 +103,7 @@ export async function analyzeRecentPatterns(
   let completedTasks = 0;
   let createdTasks = 0;
 
-  activities.forEach((activity) => {
+  activities.forEach((activity: { activityType: string; metadata: any; createdAt: Date }) => {
     const metadata = activity.metadata as ActivityMetadata;
     const hour = metadata.hour ?? new Date(activity.createdAt).getHours();
     const day = metadata.dayOfWeek ?? new Date(activity.createdAt).getDay();
