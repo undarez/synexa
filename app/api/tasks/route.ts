@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/app/lib/prisma";
 import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
 import { trackActivity } from "@/app/lib/learning/tracker";
-import type { Task } from "@prisma/client";
+import type { Task, Prisma, TaskPriority, TaskContext } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const context = searchParams.get("context");
     const groupBy = searchParams.get("groupBy"); // "priority" | "context" | "due"
 
-    const where: any = { userId: user.id };
+    const where: Prisma.TaskWhereInput = { userId: user.id };
 
     // Filtre par complétion
     if (completed !== null) {
@@ -23,12 +23,18 @@ export async function GET(request: NextRequest) {
 
     // Filtre par priorité
     if (priority) {
-      where.priority = priority;
+      const validPriorities: TaskPriority[] = ["HIGH", "MEDIUM", "LOW"];
+      if (validPriorities.includes(priority as TaskPriority)) {
+        where.priority = priority as TaskPriority;
+      }
     }
 
     // Filtre par contexte
     if (context) {
-      where.context = context;
+      const validContexts: TaskContext[] = ["PERSONAL", "WORK", "SHOPPING", "HEALTH", "OTHER"];
+      if (validContexts.includes(context as TaskContext)) {
+        where.context = context as TaskContext;
+      }
     }
 
     // Filtre par date d'échéance

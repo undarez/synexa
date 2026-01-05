@@ -13,13 +13,20 @@ describe('API Tasks - Intégration', () => {
 
   beforeAll(async () => {
     const hashedPassword = await hash('testpassword', 10);
-    testUser = await prisma.user.create({
+    const createdUser = await prisma.user.create({
       data: {
         email: `test-task-${Date.now()}@example.com`,
         password: hashedPassword,
         name: 'Test User',
       },
     });
+    if (!createdUser.email) {
+      throw new Error('User email is null');
+    }
+    testUser = {
+      id: createdUser.id,
+      email: createdUser.email,
+    };
   });
 
   afterAll(async () => {

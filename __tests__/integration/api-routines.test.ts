@@ -13,13 +13,20 @@ describe('API Routines - Intégration', () => {
 
   beforeAll(async () => {
     const hashedPassword = await hash('testpassword', 10);
-    testUser = await prisma.user.create({
+    const createdUser = await prisma.user.create({
       data: {
         email: `test-routine-${Date.now()}@example.com`,
         password: hashedPassword,
         name: 'Test User',
       },
     });
+    if (!createdUser.email) {
+      throw new Error('User email is null');
+    }
+    testUser = {
+      id: createdUser.id,
+      email: createdUser.email,
+    };
   });
 
   afterAll(async () => {
@@ -139,7 +146,6 @@ describe('API Routines - Intégration', () => {
           active: true,
           triggerType: 'MANUAL',
           triggerData: {},
-          steps: [],
         },
       });
 
@@ -147,7 +153,7 @@ describe('API Routines - Intégration', () => {
         requireUser: jest.fn().mockResolvedValue(testUser),
       }));
 
-      const response = await getRoutines(mockRequest);
+      const response = await getRoutines();
       const data = await response.json();
 
       expect(response.status).toBe(200);

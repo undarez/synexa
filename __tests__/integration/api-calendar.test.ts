@@ -14,13 +14,20 @@ describe('API Calendar - Intégration', () => {
   beforeAll(async () => {
     // Créer un utilisateur de test
     const hashedPassword = await hash('testpassword', 10);
-    testUser = await prisma.user.create({
+    const createdUser = await prisma.user.create({
       data: {
         email: `test-${Date.now()}@example.com`,
         password: hashedPassword,
         name: 'Test User',
       },
     });
+    if (!createdUser.email) {
+      throw new Error('User email is null');
+    }
+    testUser = {
+      id: createdUser.id,
+      email: createdUser.email,
+    };
   });
 
   afterAll(async () => {

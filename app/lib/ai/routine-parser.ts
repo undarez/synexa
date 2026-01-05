@@ -134,14 +134,28 @@ Pour DEVICE_COMMAND, utilise les noms de devices disponibles pour matcher.`;
     throw new Error("Réponse Groq vide");
   }
 
-  const parsed = JSON.parse(content);
+  const parsed = JSON.parse(content) as {
+    name: string;
+    description?: string;
+    triggerType: string;
+    triggerData?: Record<string, unknown>;
+    steps: Array<{
+      actionType: string;
+      payload?: Record<string, unknown>;
+      deviceId?: string | null;
+      deviceName?: string;
+      delaySeconds?: number | null;
+      order?: number;
+    }>;
+    confidence?: number;
+  };
   
   // Matcher les devices par nom
-  const matchedSteps = parsed.steps.map((step: any, index: number) => {
+  const matchedSteps = parsed.steps.map((step, index: number) => {
     if (step.actionType === "DEVICE_COMMAND" && step.deviceName) {
       const device = devices.find(
-        d => d.name.toLowerCase().includes(step.deviceName.toLowerCase()) ||
-             step.deviceName.toLowerCase().includes(d.name.toLowerCase())
+        d => d.name.toLowerCase().includes(step.deviceName!.toLowerCase()) ||
+             step.deviceName!.toLowerCase().includes(d.name.toLowerCase())
       );
       if (device) {
         step.deviceId = device.id;
@@ -149,7 +163,10 @@ Pour DEVICE_COMMAND, utilise les noms de devices disponibles pour matcher.`;
       delete step.deviceName;
     }
     return {
-      ...step,
+      actionType: step.actionType as RoutineActionType,
+      payload: step.payload,
+      deviceId: step.deviceId ?? null,
+      delaySeconds: step.delaySeconds ?? null,
       order: index,
     };
   });

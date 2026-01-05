@@ -22,7 +22,7 @@ import {
 } from "@/app/components/ui/dialog";
 import { RoutineStepEditor, type RoutineStep } from "@/app/components/RoutineStepEditor";
 import { NaturalLanguageRoutineInput } from "@/app/components/NaturalLanguageRoutineInput";
-import { RoutineTriggerType } from "@prisma/client";
+import { RoutineTriggerType, RoutineActionType } from "@prisma/client";
 import type { Routine } from "@prisma/client";
 import type { ParsedRoutine } from "@/app/lib/ai/routine-parser";
 
@@ -63,7 +63,7 @@ export function RoutineForm({
       setSteps(
         (routine.steps || []).map((step: { id: string; order: number; actionType: string; payload?: unknown; deviceId?: string | null; delaySeconds?: number | null }) => ({
           id: step.id,
-          actionType: step.actionType as any,
+          actionType: step.actionType as RoutineActionType,
           payload: (step.payload as Record<string, unknown>) || {},
           deviceId: step.deviceId || null,
           delaySeconds: step.delaySeconds || null,

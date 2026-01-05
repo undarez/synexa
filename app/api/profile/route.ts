@@ -4,6 +4,7 @@ import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
 import { generateUserCode } from "@/app/lib/user-code";
 import { encryptUserData, decryptUserData } from "@/app/lib/encryption-helpers";
 import { logger } from "@/app/lib/logger";
+import type { Prisma } from "@prisma/client";
 
 export async function GET() {
   let user;
@@ -61,9 +62,13 @@ export async function GET() {
           },
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Si les colonnes n'existent pas encore, utiliser les champs de base
-      if (error?.code === "P2022" || error?.message?.includes("does not exist")) {
+      const isPrismaError = error && typeof error === "object" && ("code" in error || "message" in error);
+      const errorCode = isPrismaError && "code" in error ? String(error.code) : undefined;
+      const errorMessage = isPrismaError && "message" in error && typeof error.message === "string" ? error.message : "";
+      
+      if (errorCode === "P2022" || errorMessage.includes("does not exist")) {
         userProfile = await prisma.user.findUnique({
           where: { id: user.id },
           select: {
@@ -92,16 +97,27 @@ export async function GET() {
           });
         }
         
-        // Ajouter les champs manquants avec null
+        // Ajouter les champs manquants avec null (type assertion nécessaire pour compatibilité)
         if (userProfile) {
-          (userProfile as any).userCode = null;
-          (userProfile as any).pseudo = null;
-          (userProfile as any).firstName = null;
-          (userProfile as any).lastName = null;
-          (userProfile as any).homeAddress = null;
-          (userProfile as any).workAddress = null;
-          (userProfile as any).workLat = null;
-          (userProfile as any).workLng = null;
+          const extendedProfile = userProfile as typeof userProfile & {
+            userCode: string | null;
+            pseudo: string | null;
+            firstName: string | null;
+            lastName: string | null;
+            homeAddress: string | null;
+            workAddress: string | null;
+            workLat: number | null;
+            workLng: number | null;
+          };
+          extendedProfile.userCode = null;
+          extendedProfile.pseudo = null;
+          extendedProfile.firstName = null;
+          extendedProfile.lastName = null;
+          extendedProfile.homeAddress = null;
+          extendedProfile.workAddress = null;
+          extendedProfile.workLat = null;
+          extendedProfile.workLng = null;
+          userProfile = extendedProfile;
         }
       } else {
         throw error;
