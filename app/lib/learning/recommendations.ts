@@ -43,7 +43,7 @@ export async function getPersonalizedRecommendations(
     (p: UserLearning) => p.category === "task" && p.pattern.startsWith("recurring_task:")
   );
 
-  recurringTaskPatterns.forEach((pattern) => {
+  recurringTaskPatterns.forEach((pattern: UserLearning) => {
     const metadata = pattern.metadata as any;
     if (metadata && metadata.count >= 3) {
       recommendations.push({
@@ -94,7 +94,7 @@ export async function getPersonalizedRecommendations(
     (p: UserLearning) => p.category === "routine" && p.pattern.startsWith("frequent_routine:")
   );
 
-  frequentRoutinePatterns.forEach((pattern) => {
+  frequentRoutinePatterns.forEach((pattern: UserLearning) => {
     const metadata = pattern.metadata as any;
     if (metadata && metadata.executionCount >= 5) {
       const routineHour = metadata.preferredHour;
