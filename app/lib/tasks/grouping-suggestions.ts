@@ -40,7 +40,10 @@ export async function getGroupingSuggestions(
     MEDIUM: 0,
     LOW: 0,
   };
-  tasks.forEach((t: Task) => priorityCounts[t.priority]++);
+  tasks.forEach((t: Task) => {
+    const priority = t.priority as TaskPriority;
+    priorityCounts[priority]++;
+  });
   
   const hasMultiplePriorities = Object.values(priorityCounts).filter(c => c > 0).length > 1;
   if (hasMultiplePriorities && priorityCounts.HIGH > 0) {
@@ -65,7 +68,10 @@ export async function getGroupingSuggestions(
     LEARNING: 0,
     OTHER: 0,
   };
-  tasks.forEach((t: Task) => contextCounts[t.context]++);
+  tasks.forEach((t: Task) => {
+    const context = t.context as TaskContext;
+    contextCounts[context]++;
+  });
   
   const contextsWithMultipleTasks = Object.entries(contextCounts)
     .filter(([_, count]) => count >= 2)
