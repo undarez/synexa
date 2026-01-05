@@ -182,7 +182,7 @@ export async function getRecentActivities(
     },
   });
 
-  return activities.map(a => ({
+  return activities.map((a: { activityType: string; metadata: any; createdAt: Date }) => ({
     activityType: a.activityType as ActivityType,
     createdAt: a.createdAt,
     metadata: a.metadata as ActivityMetadata,
