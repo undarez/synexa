@@ -4,6 +4,9 @@
 
 import prisma from "@/app/lib/prisma";
 import { searchNews, type NewsArticle, type NewsCategory } from "./news";
+import type { Preference } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { toJsonInput } from "@/app/lib/prisma/json";
 
 export interface NewsPreferences {
   preferredCategories?: NewsCategory[];
@@ -35,8 +38,8 @@ export async function getUserNewsPreferences(userId: string): Promise<NewsPrefer
       maxArticles: 20,
     };
 
-    preferences.forEach((pref) => {
-      const value = pref.value as any;
+    preferences.forEach((pref: Preference) => {
+      const value = pref.value as unknown;
       switch (pref.key) {
         case "news_categories":
           prefs.preferredCategories = Array.isArray(value) ? value : [];
@@ -95,9 +98,9 @@ async function inferPreferredCategories(userId: string): Promise<NewsCategory[]>
     });
 
     const categoryCounts: Record<string, number> = {};
-    activities.forEach((activity) => {
-      const metadata = activity.metadata as any;
-      if (metadata?.category) {
+    activities.forEach((activity: { metadata: unknown }) => {
+      const metadata = activity.metadata as Record<string, unknown> | null;
+      if (metadata && typeof metadata.category === "string") {
         categoryCounts[metadata.category] = (categoryCounts[metadata.category] || 0) + 1;
       }
     });
@@ -216,8 +219,9 @@ export async function getPersonalizedNews(
 export async function saveNewsPreference(
   userId: string,
   key: string,
-  value: any
+  value: unknown
 ): Promise<void> {
+  const jsonValue = toJsonInput(value) ?? Prisma.JsonNull;
   await prisma.preference.upsert({
     where: {
       userId_key: {
@@ -226,12 +230,12 @@ export async function saveNewsPreference(
       },
     },
     update: {
-      value: value as any,
+      value: jsonValue,
     },
     create: {
       userId,
       key: `news_${key}`,
-      value: value as any,
+      value: jsonValue,
     },
   });
 }
