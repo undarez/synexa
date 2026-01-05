@@ -4,7 +4,7 @@
  */
 
 import prisma from "@/app/lib/prisma";
-import type { TaskContext, TaskPriority } from "@prisma/client";
+import type { TaskContext, TaskPriority, Task } from "@prisma/client";
 
 export interface GroupingSuggestion {
   type: "priority" | "context" | "due" | "energy" | "duration";
@@ -40,7 +40,7 @@ export async function getGroupingSuggestions(
     MEDIUM: 0,
     LOW: 0,
   };
-  tasks.forEach(t => priorityCounts[t.priority]++);
+  tasks.forEach((t: Task) => priorityCounts[t.priority]++);
   
   const hasMultiplePriorities = Object.values(priorityCounts).filter(c => c > 0).length > 1;
   if (hasMultiplePriorities && priorityCounts.HIGH > 0) {
@@ -65,7 +65,7 @@ export async function getGroupingSuggestions(
     LEARNING: 0,
     OTHER: 0,
   };
-  tasks.forEach(t => contextCounts[t.context]++);
+  tasks.forEach((t: Task) => contextCounts[t.context]++);
   
   const contextsWithMultipleTasks = Object.entries(contextCounts)
     .filter(([_, count]) => count >= 2)
@@ -85,17 +85,17 @@ export async function getGroupingSuggestions(
   }
 
   // 3. Suggestion par date d'échéance
-  const tasksWithDue = tasks.filter(t => t.due);
+  const tasksWithDue = tasks.filter((t: Task) => t.due);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
-  const overdueTasks = tasksWithDue.filter(t => t.due && new Date(t.due) < today);
-  const todayTasks = tasksWithDue.filter(t => {
+  const overdueTasks = tasksWithDue.filter((t: Task) => t.due && new Date(t.due) < today);
+  const todayTasks = tasksWithDue.filter((t: Task) => {
     const due = new Date(t.due!);
     due.setHours(0, 0, 0, 0);
     return due.getTime() === today.getTime();
   });
-  const thisWeekTasks = tasksWithDue.filter(t => {
+  const thisWeekTasks = tasksWithDue.filter((t: Task) => {
     const due = new Date(t.due!);
     const weekFromNow = new Date(today);
     weekFromNow.setDate(weekFromNow.getDate() + 7);
@@ -114,7 +114,7 @@ export async function getGroupingSuggestions(
 
   // 4. Suggestion par niveau d'énergie
   const energyCounts: Record<string, number> = {};
-  tasks.forEach(t => {
+  tasks.forEach((t: Task) => {
     if (t.energyLevel) {
       energyCounts[t.energyLevel] = (energyCounts[t.energyLevel] || 0) + 1;
     }
@@ -127,15 +127,15 @@ export async function getGroupingSuggestions(
       label: "Par niveau d'énergie",
       reason: "Groupez les tâches selon votre niveau d'énergie disponible",
       confidence: 0.6,
-      tasksCount: tasks.filter(t => t.energyLevel).length,
+      tasksCount: tasks.filter((t: Task) => t.energyLevel).length,
     });
   }
 
   // 5. Suggestion par durée
-  const tasksWithDuration = tasks.filter(t => t.estimatedDuration);
-  const shortTasks = tasksWithDuration.filter(t => (t.estimatedDuration || 0) <= 15);
-  const mediumTasks = tasksWithDuration.filter(t => (t.estimatedDuration || 0) > 15 && (t.estimatedDuration || 0) <= 60);
-  const longTasks = tasksWithDuration.filter(t => (t.estimatedDuration || 0) > 60);
+  const tasksWithDuration = tasks.filter((t: Task) => t.estimatedDuration);
+  const shortTasks = tasksWithDuration.filter((t: Task) => (t.estimatedDuration || 0) <= 15);
+  const mediumTasks = tasksWithDuration.filter((t: Task) => (t.estimatedDuration || 0) > 15 && (t.estimatedDuration || 0) <= 60);
+  const longTasks = tasksWithDuration.filter((t: Task) => (t.estimatedDuration || 0) > 60);
 
   if (shortTasks.length >= 2 || mediumTasks.length >= 2 || longTasks.length >= 2) {
     suggestions.push({
