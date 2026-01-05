@@ -203,7 +203,7 @@ async function detectVoiceCommandPatterns(userId: string): Promise<DetectedPatte
     });
 
     const hourCounts: Record<number, number> = {};
-    hours.forEach((h) => {
+    hours.forEach((h: number) => {
       hourCounts[h] = (hourCounts[h] || 0) + 1;
     });
 
