@@ -25,16 +25,17 @@ async function main() {
     `;
     
     console.log("📋 Tables créées:");
-    tables.forEach(table => {
+    tables.forEach((table: { tablename: string }) => {
       console.log(`   ✅ ${table.tablename}`);
     });
     
     console.log("\n✅ Base de données configurée avec succès!");
-  } catch (error: any) {
-    console.error("❌ Erreur:", error.message);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("❌ Erreur:", errorMessage);
     
     // Si les tables existent déjà, c'est OK
-    if (error.message.includes("already exists") || error.message.includes("duplicate")) {
+    if (errorMessage.includes("already exists") || errorMessage.includes("duplicate")) {
       console.log("\n⚠️  Les tables existent déjà. C'est normal.");
     } else {
       process.exit(1);
