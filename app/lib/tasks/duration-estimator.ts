@@ -51,10 +51,10 @@ export async function estimateTaskDuration(
   
   if (similarTasks.length > 0) {
     // Calculer la moyenne des durées réelles
-    const completedTasks = similarTasks.filter(t => t.completed && t.completedAt && t.createdAt);
+    const completedTasks = similarTasks.filter((t: SimilarTask) => t.completed && t.completedAt && t.createdAt);
     const actualDurations: number[] = [];
     
-    completedTasks.forEach(task => {
+    completedTasks.forEach((task: SimilarTask) => {
       if (task.completedAt && task.createdAt) {
         const duration = Math.round(
           (task.completedAt.getTime() - task.createdAt.getTime()) / (1000 * 60)
@@ -78,8 +78,8 @@ export async function estimateTaskDuration(
     
     // Utiliser les durées estimées des tâches similaires
     const estimatedDurations = similarTasks
-      .filter(t => t.estimatedDuration && t.estimatedDuration > 0)
-      .map(t => t.estimatedDuration!);
+      .filter((t: SimilarTask) => t.estimatedDuration && t.estimatedDuration > 0)
+      .map((t: SimilarTask) => t.estimatedDuration!);
     
     if (estimatedDurations.length > 0) {
       const avgEstimated = estimatedDurations.reduce((sum, d) => sum + d, 0) / estimatedDurations.length;
@@ -123,6 +123,15 @@ export async function estimateTaskDuration(
   };
 }
 
+type SimilarTask = {
+  id: string;
+  title: string;
+  estimatedDuration: number | null;
+  completed: boolean;
+  completedAt: Date | null;
+  createdAt: Date;
+};
+
 /**
  * Trouve des tâches similaires dans l'historique
  */
@@ -130,14 +139,7 @@ async function findSimilarTasks(
   userId: string,
   title: string,
   context: TaskContext
-): Promise<Array<{
-  id: string;
-  title: string;
-  estimatedDuration: number | null;
-  completed: boolean;
-  completedAt: Date | null;
-  createdAt: Date;
-}>> {
+): Promise<SimilarTask[]> {
   const titleWords = title
     .toLowerCase()
     .split(/\s+/)
@@ -169,7 +171,7 @@ async function findSimilarTasks(
   });
   
   // Filtrer par similarité (au moins 1 mot en commun)
-  const similarTasks = tasks.filter(task => {
+  const similarTasks = tasks.filter((task: SimilarTask) => {
     const taskWords = task.title
       .toLowerCase()
       .split(/\s+/)
@@ -180,7 +182,7 @@ async function findSimilarTasks(
   });
   
   // Trier par similarité (plus de mots en commun = plus similaire)
-  similarTasks.sort((a, b) => {
+  similarTasks.sort((a: SimilarTask, b: SimilarTask) => {
     const aWords = a.title.toLowerCase().split(/\s+/).filter(w => w.length > 3);
     const bWords = b.title.toLowerCase().split(/\s+/).filter(w => w.length > 3);
     const aCommon = titleWords.filter(w => aWords.includes(w)).length;
