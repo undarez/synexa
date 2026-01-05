@@ -4,6 +4,7 @@
  */
 
 import prisma from "@/app/lib/prisma";
+import { UserLearning } from "@prisma/client";
 import { detectPatterns } from "./patterns";
 import { analyzeRecentPatterns } from "./tracker";
 
@@ -39,7 +40,7 @@ export async function getPersonalizedRecommendations(
 
   // Recommandation 1: Tâches récurrentes suggérées
   const recurringTaskPatterns = learnedPatterns.filter(
-    (p) => p.category === "task" && p.pattern.startsWith("recurring_task:")
+    (p: UserLearning) => p.category === "task" && p.pattern.startsWith("recurring_task:")
   );
 
   recurringTaskPatterns.forEach((pattern) => {
@@ -67,7 +68,7 @@ export async function getPersonalizedRecommendations(
 
   // Recommandation 2: Optimisation des heures de travail
   const preferredHoursPattern = learnedPatterns.find(
-    (p) => p.category === "task" && p.pattern === "preferred_hours"
+    (p: UserLearning) => p.category === "task" && p.pattern === "preferred_hours"
   );
 
   if (preferredHoursPattern) {
@@ -90,7 +91,7 @@ export async function getPersonalizedRecommendations(
 
   // Recommandation 3: Routines suggérées
   const frequentRoutinePatterns = learnedPatterns.filter(
-    (p) => p.category === "routine" && p.pattern.startsWith("frequent_routine:")
+    (p: UserLearning) => p.category === "routine" && p.pattern.startsWith("frequent_routine:")
   );
 
   frequentRoutinePatterns.forEach((pattern) => {
@@ -172,8 +173,8 @@ export async function adaptSuggestions(
   // Adapter les suggestions de tâches
   if (suggestionType === "task") {
     const preferredContexts = learnedPatterns
-      .filter((p) => p.pattern === "preferred_contexts")
-      .map((p) => (p.metadata as any)?.contexts || [])
+      .filter((p: UserLearning) => p.pattern === "preferred_contexts")
+      .map((p: UserLearning) => (p.metadata as any)?.contexts || [])
       .flat();
 
     if (preferredContexts.length > 0) {
@@ -181,7 +182,7 @@ export async function adaptSuggestions(
     }
 
     const preferredHours = learnedPatterns
-      .find((p) => p.pattern === "preferred_hours")
+      .find((p: UserLearning) => p.pattern === "preferred_hours")
       ?.metadata as any;
 
     if (preferredHours?.hours) {
