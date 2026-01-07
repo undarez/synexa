@@ -97,7 +97,16 @@ export const authOptions: NextAuthOptions = {
    */
 
   callbacks: {
-    async signIn({ account }) {
+    async signIn({ user, account }) {
+      console.log("🔐 [NEXTAUTH] signIn callback:", {
+        userId: user?.id,
+        email: user?.email,
+        provider: account?.provider,
+        hasAccessToken: !!account?.access_token,
+        hasRefreshToken: !!account?.refresh_token,
+        hasDatabaseUrl: !!process.env.DATABASE_URL,
+      });
+
       if (!process.env.DATABASE_URL) {
         console.error("❌ DATABASE_URL manquant");
         return false;
@@ -108,18 +117,54 @@ export const authOptions: NextAuthOptions = {
         return false;
       }
 
+      console.log("✅ [NEXTAUTH] signIn autorisé");
       return true;
     },
 
     async session({ session, user }) {
+      console.log("👤 [NEXTAUTH] session callback:", {
+        userId: user?.id,
+        email: session.user?.email,
+        hasUser: !!user,
+        hasSession: !!session,
+      });
+
       if (session.user && user) {
         session.user.id = user.id;
+      } else {
+        console.warn("⚠️ [NEXTAUTH] Session sans user - possible problème DB");
       }
+
       return session;
     },
 
-    async redirect({ baseUrl }) {
+    async redirect({ url, baseUrl }) {
+      console.log("🔄 [NEXTAUTH] redirect callback:", { url, baseUrl });
       return `${baseUrl}/dashboard`;
+    },
+  },
+
+  events: {
+    async signIn({ user, account, isNewUser }) {
+      console.log("📝 [NEXTAUTH] Event signIn:", {
+        userId: user?.id,
+        email: user?.email,
+        isNewUser,
+        provider: account?.provider,
+      });
+    },
+    async createUser({ user }) {
+      console.log("➕ [NEXTAUTH] Event createUser:", {
+        userId: user.id,
+        email: user.email,
+      });
+    },
+    async linkAccount({ user, account }) {
+      console.log("🔗 [NEXTAUTH] Event linkAccount:", {
+        userId: user.id,
+        provider: account.provider,
+        providerAccountId: account.providerAccountId,
+      });
     },
   },
 
