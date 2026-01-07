@@ -2,11 +2,13 @@
 
 import { signIn } from "next-auth/react";
 import { useState } from "react";
+import { LoginModal } from "./LoginModal";
+import { RegisterModal } from "./RegisterModal";
 
 export default function AuthButtons() {
   const [isLoading, setIsLoading] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [registerModalOpen, setRegisterModalOpen] = useState(false);
 
   const handleGoogleSignIn = () => {
     console.log("🔵 [AUTHBUTTONS] Clic sur Google Sign In");
@@ -25,18 +27,9 @@ export default function AuthButtons() {
     signIn("facebook", { callbackUrl: "/dashboard" });
   };
 
-  const handleCredentialsSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    
-    await signIn("credentials", {
-      email,
-      password,
-      callbackUrl: "/dashboard",
-      redirect: true,
-    });
-    
-    setIsLoading(false);
+  const handleRegisterSuccess = () => {
+    setRegisterModalOpen(false);
+    setLoginModalOpen(true);
   };
 
   return (
@@ -82,35 +75,33 @@ export default function AuthButtons() {
 
       <div className="border-t border-zinc-200 pt-4 dark:border-zinc-800">
         <p className="mb-4 text-center text-sm text-zinc-600 dark:text-zinc-400">
-          Ou connectez-vous avec email et mot de passe
+          Ou utilisez votre email et mot de passe
         </p>
 
-        <form onSubmit={handleCredentialsSignIn} className="flex flex-col gap-3">
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="h-12 rounded-lg border border-zinc-300 bg-white px-4 text-sm text-zinc-900 placeholder-zinc-500 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder-zinc-400 dark:focus:border-zinc-500"
-          />
-          <input
-            type="password"
-            placeholder="Mot de passe"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="h-12 rounded-lg border border-zinc-300 bg-white px-4 text-sm text-zinc-900 placeholder-zinc-500 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder-zinc-400 dark:focus:border-zinc-500"
-          />
+        <div className="flex flex-col gap-3">
           <button
-            type="submit"
+            onClick={() => setLoginModalOpen(true)}
+            disabled={isLoading}
+            className="h-12 rounded-lg border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-700"
+          >
+            Se connecter
+          </button>
+          <button
+            onClick={() => setRegisterModalOpen(true)}
             disabled={isLoading}
             className="h-12 rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-100"
           >
-            {isLoading ? "Connexion..." : "Se connecter"}
+            Créer un compte
           </button>
-        </form>
+        </div>
       </div>
+
+      <LoginModal open={loginModalOpen} onOpenChange={setLoginModalOpen} />
+      <RegisterModal
+        open={registerModalOpen}
+        onOpenChange={setRegisterModalOpen}
+        onSuccess={handleRegisterSuccess}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Button } from "@/app/components/ui/button";
 import { Footer } from "@/app/components/Footer";
 import { HeroSection } from "@/app/components/HeroSection";
+import { AuthMenu } from "@/app/components/auth/AuthMenu";
 
 export const dynamic = 'force-dynamic';
 import {
@@ -141,16 +142,7 @@ export default async function HomePage({
                   <Button size="sm">Aller au dashboard</Button>
                 </Link>
               ) : (
-                <>
-                  <Link href="/auth/signin">
-                    <Button variant="outline" size="sm">
-                      Connexion
-                    </Button>
-                  </Link>
-                  <Link href="/auth/signin">
-                    <Button size="sm">Commencer</Button>
-                  </Link>
-                </>
+                <AuthMenu />
               )}
             </div>
           </div>
