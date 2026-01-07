@@ -1,6 +1,6 @@
 // Service Worker pour PWA et notifications push
 // Version corrigée pour éviter les conflits avec NextAuth OAuth
-const CACHE_NAME = "synexa-v3"; // Version incrémentée pour forcer la mise à jour (v3: fix NextAuth session)
+const CACHE_NAME = "synexa-v4"; // Version incrémentée pour forcer la mise à jour (v4: fix NextAuth OAuth Google)
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -99,16 +99,17 @@ self.addEventListener("fetch", (event) => {
   try {
     const url = new URL(request.url);
 
-    // IGNORER COMPLÈTEMENT les routes NextAuth - NE PAS les intercepter
+    // ✅ CRITIQUE : IGNORER COMPLÈTEMENT les routes NextAuth - NE PAS les intercepter
     // Selon la documentation officielle NextAuth.js, les routes /api/auth/* ne doivent
     // JAMAIS être interceptées par le Service Worker pour garantir le bon fonctionnement
-    // de l'authentification. Ne pas appeler event.respondWith() = la requête passe
-    // directement au réseau sans aucune intervention du SW.
+    // de l'authentification OAuth (Google, Facebook, etc.)
+    // 
+    // Ne pas appeler event.respondWith() = la requête passe directement au réseau
+    // sans aucune intervention du SW, ce qui est essentiel pour les callbacks OAuth
     if (url.pathname.startsWith("/api/auth/")) {
-      console.log("[SW] Route NextAuth ignorée (pas d'interception):", url.pathname, request.method);
-      // Ne pas appeler event.respondWith() = la requête passe directement au réseau
+      // Ne rien faire = la requête passe directement au serveur Next.js
       // C'est la méthode recommandée par la documentation officielle NextAuth.js
-      return;
+      return; // Sortir immédiatement, ne pas intercepter
     }
 
     // Ignorer complètement les requêtes non-GET (sauf pour NextAuth qui est déjà géré ci-dessus)
