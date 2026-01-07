@@ -31,3 +31,4 @@ Les tables `FavoriteArticle` et `FavoriteStock` seront créées dans la base de 
 
 
 
+
