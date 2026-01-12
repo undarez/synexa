@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import { Calendar, Loader2, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { signIn } from "next-auth/react";
+import { useAuth } from "@/app/lib/auth/use-auth";
 
 export function GoogleCalendarSync() {
+  const { session, signInWithGoogle } = useAuth();
   const [connected, setConnected] = useState<boolean | null>(null);
   const [needsReconnect, setNeedsReconnect] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -16,11 +17,24 @@ export function GoogleCalendarSync() {
 
   useEffect(() => {
     checkConnection();
-  }, []);
+  }, [session]);
 
   const checkConnection = async () => {
     try {
-      const response = await fetch("/api/calendar/sync");
+      // Vérifier si on a un provider_token dans la session
+      if (!session?.provider_token) {
+        setConnected(false);
+        setNeedsReconnect(false);
+        return;
+      }
+
+      // Vérifier que le token fonctionne avec Google Calendar API
+      const response = await fetch("/api/calendar/sync", {
+        headers: {
+          Authorization: `Bearer ${session.provider_token}`,
+        },
+      });
+
       if (response.ok) {
         const data = await response.json();
         setConnected(data.connected);
@@ -29,6 +43,9 @@ export function GoogleCalendarSync() {
         // Problème de scopes, forcer la reconnexion
         setConnected(false);
         setNeedsReconnect(true);
+      } else {
+        setConnected(false);
+        setNeedsReconnect(false);
       }
     } catch (err) {
       console.error("Erreur vérification connexion:", err);
@@ -36,13 +53,21 @@ export function GoogleCalendarSync() {
     }
   };
 
-  const handleConnect = () => {
-    signIn("google", {
-      callbackUrl: "/calendar",
-    });
+  const handleConnect = async () => {
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      console.error("Erreur connexion Google:", err);
+      setError("Erreur lors de la connexion avec Google");
+    }
   };
 
   const handleSync = async () => {
+    if (!session?.provider_token) {
+      setError("Aucun token Google disponible. Veuillez vous connecter avec Google.");
+      return;
+    }
+
     setSyncing(true);
     setError(null);
     setSuccess(false);
@@ -51,7 +76,10 @@ export function GoogleCalendarSync() {
       const response = await fetch("/api/calendar/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ daysAhead: 30 }),
+        body: JSON.stringify({ 
+          daysAhead: 30,
+          providerToken: session.provider_token,
+        }),
       });
 
       if (!response.ok) {

@@ -21,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/app/components/ui/dialog";
-import type { Task, TaskPriority, TaskContext, EnergyLevel } from "@prisma/client";
+import type { Task, TaskPriority, TaskContext, EnergyLevel } from "@/app/lib/supabase/types";
 import { AlertCircle, Clock, Zap, Briefcase, ShoppingBag, Heart, Wallet, Home, Users, BookOpen, MoreHorizontal, Loader2 } from "lucide-react";
 
 interface TaskFormProps {
@@ -298,15 +298,15 @@ export function TaskForm({ task, open, onOpenChange, onSuccess }: TaskFormProps)
                   Énergie requise
                 </Label>
                 <Select
-                  value={energyLevel || ""}
-                  onValueChange={(value) => setEnergyLevel(value ? (value as EnergyLevel) : null)}
+                  value={energyLevel || "NONE"}
+                  onValueChange={(value) => setEnergyLevel(value === "NONE" ? null : (value as EnergyLevel))}
                   disabled={loading}
                 >
                   <SelectTrigger id="energyLevel">
                     <SelectValue placeholder="Optionnel" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Aucun</SelectItem>
+                    <SelectItem value="NONE">Aucun</SelectItem>
                     <SelectItem value="HIGH">Élevé</SelectItem>
                     <SelectItem value="MEDIUM">Moyen</SelectItem>
                     <SelectItem value="LOW">Faible</SelectItem>

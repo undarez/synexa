@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useEffect, useState, useRef } from "react";
+import { useSession } from "@/app/lib/auth/mock-client";
 import { redirect } from "next/navigation";
 import { 
   Users, 
@@ -56,6 +56,8 @@ export default function AdminPage() {
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [securityLogs, setSecurityLogs] = useState<any[]>([]);
   const [selectedTab, setSelectedTab] = useState("users");
+  const hasLoadedRef = useRef(false);
+  const userEmailRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -64,47 +66,74 @@ export default function AdminPage() {
   }, [status]);
 
   useEffect(() => {
-    if (status === "authenticated" && session?.user?.email) {
-      // Vérifier si l'utilisateur est admin
-      if (session.user.email?.toLowerCase() !== "fortuna77320@gmail.com") {
-        setError("Accès refusé : droits administrateur requis");
-        setLoading(false);
-        return;
-      }
-      loadAdminData();
+    // Ne traiter que si authentifié
+    if (status !== "authenticated") {
+      return;
     }
-  }, [status, session]);
 
-  const loadAdminData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+    // Lire l'email une seule fois pour éviter les re-renders
+    const currentEmail = session?.user?.email;
+    
+    if (!currentEmail) {
+      return;
+    }
 
-      const [usersRes, statsRes, logsRes] = await Promise.all([
-        fetch("/api/admin/users"),
-        fetch("/api/admin/stats"),
-        fetch("/api/admin/security-logs"),
-      ]);
-
-      if (!usersRes.ok || !statsRes.ok || !logsRes.ok) {
-        throw new Error("Erreur lors du chargement des données");
-      }
-
-      const [usersData, statsData, logsData] = await Promise.all([
-        usersRes.json(),
-        statsRes.json(),
-        logsRes.json(),
-      ]);
-
-      setUsers(usersData.users || []);
-      setStats(statsData.stats || null);
-      setSecurityLogs(logsData.logs || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Une erreur est survenue");
-    } finally {
+    // Vérifier si l'utilisateur est admin
+    if (currentEmail.toLowerCase() !== "fortuna77320@gmail.com") {
+      setError("Accès refusé : droits administrateur requis");
       setLoading(false);
+      hasLoadedRef.current = false;
+      userEmailRef.current = null;
+      return;
     }
-  };
+
+    // Éviter les rechargements inutiles : vérifier si déjà chargé pour cet email
+    if (hasLoadedRef.current && userEmailRef.current === currentEmail) {
+      // Déjà chargé, ne rien faire
+      return;
+    }
+
+    // Charger les données uniquement si pas encore chargées ou email différent
+    const loadAdminData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [usersRes, statsRes, logsRes] = await Promise.all([
+          fetch("/api/admin/users"),
+          fetch("/api/admin/stats"),
+          fetch("/api/admin/security-logs"),
+        ]);
+
+        if (!usersRes.ok || !statsRes.ok || !logsRes.ok) {
+          throw new Error("Erreur lors du chargement des données");
+        }
+
+        const [usersData, statsData, logsData] = await Promise.all([
+          usersRes.json(),
+          statsRes.json(),
+          logsRes.json(),
+        ]);
+
+        setUsers(usersData.users || []);
+        setStats(statsData.stats || null);
+        setSecurityLogs(logsData.logs || []);
+        
+        // Marquer comme chargé pour cet email
+        hasLoadedRef.current = true;
+        userEmailRef.current = currentEmail;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Une erreur est survenue");
+        hasLoadedRef.current = false;
+        userEmailRef.current = null;
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAdminData();
+  }, [status]); // ✅ Utiliser uniquement status comme dépendance
+
 
   const handleDeleteUser = async (userId: string) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cette action est irréversible.")) {
@@ -120,8 +149,26 @@ export default function AdminPage() {
         throw new Error("Erreur lors de la suppression");
       }
 
-      // Recharger les données
-      await loadAdminData();
+      // Recharger les données après suppression
+      hasLoadedRef.current = false;
+      const [usersRes, statsRes, logsRes] = await Promise.all([
+        fetch("/api/admin/users"),
+        fetch("/api/admin/stats"),
+        fetch("/api/admin/security-logs"),
+      ]);
+
+      if (usersRes.ok && statsRes.ok && logsRes.ok) {
+        const [usersData, statsData, logsData] = await Promise.all([
+          usersRes.json(),
+          statsRes.json(),
+          logsRes.json(),
+        ]);
+
+        setUsers(usersData.users || []);
+        setStats(statsData.stats || null);
+        setSecurityLogs(logsData.logs || []);
+        hasLoadedRef.current = true;
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : "Erreur lors de la suppression");
     }

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { Calendar, MapPin, ArrowRight } from "lucide-react";
-import type { CalendarEvent } from "@prisma/client";
+import type { CalendarEvent } from "@/app/lib/supabase/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
 

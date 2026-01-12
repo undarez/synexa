@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { getCurrentUser } from "@/app/lib/auth/server";
+import { UserGreeting } from "@/app/components/dashboard/UserGreeting";
 import { startOfDay, endOfDay } from "date-fns";
-import prisma from "@/app/lib/prisma";
-import type { Routine } from "@prisma/client";
+import { supabase } from "@/app/lib/supabase/client";
+import type { Routine } from "@/app/lib/supabase/types";
 
 export const dynamic = 'force-dynamic';
 import { Navigation } from "@/app/components/Navigation";
@@ -20,70 +20,26 @@ import { WellnessDashboard } from "@/app/components/WellnessDashboard";
 import { DashboardWidgetManager } from "@/app/components/DashboardWidgetManager";
 import { SynexaProactiveSuggestions } from "@/app/components/SynexaProactiveSuggestions";
 
-async function getUserDisplayName(userId: string): Promise<string> {
-  try {
-    // Essayer de récupérer avec les nouveaux champs
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        pseudo: true,
-        firstName: true,
-        name: true,
-        email: true,
-      },
-    });
-
-    return (
-      (user as any)?.pseudo ||
-      (user as any)?.firstName ||
-      user?.name ||
-      user?.email ||
-      "Utilisateur"
-    );
-  } catch (error: any) {
-    // Si les colonnes n'existent pas encore, utiliser les champs de base
-    if (error?.code === "P2022" || error?.message?.includes("does not exist")) {
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { name: true, email: true },
-      });
-      return user?.name || user?.email || "Utilisateur";
-    }
-    throw error;
-  }
-}
+// getUserDisplayName n'est plus nécessaire, getCurrentUser retourne déjà toutes les infos nécessaires
 
 async function getDashboardData(userId: string) {
   try {
-    const now = new Date();
+    // TODO: Remplacer par Supabase
+    // const now = new Date();
+    // const start = startOfDay(now).toISOString();
+    // const end = endOfDay(now).toISOString();
+    // 
+    // const [events, tasks, routines] = await Promise.all([
+    //   supabase.from('CalendarEvent').select('*').eq('userId', userId).gte('start', start).lt('start', end).order('start', { ascending: true }),
+    //   supabase.from('Task').select('*').eq('userId', userId).order('due', { ascending: true }).limit(5),
+    //   supabase.from('Routine').select('*').eq('userId', userId).eq('active', true).order('createdAt', { ascending: true }),
+    // ]);
 
-    const [events, tasks, routines] = await Promise.all([
-      prisma.calendarEvent.findMany({
-        where: {
-          userId,
-          start: { gte: startOfDay(now), lt: endOfDay(now) },
-        },
-        orderBy: { start: "asc" },
-      }),
-      prisma.task.findMany({
-        where: { userId },
-        orderBy: { due: "asc" },
-        take: 5,
-      }),
-      prisma.routine.findMany({
-        where: { userId, active: true },
-        orderBy: { createdAt: "asc" },
-      }),
-    ]);
-
+    // Pour l'instant, retourner des données vides
     return {
-      agenda: events,
-      tasks,
-      activeRoutines: routines.map((routine: Routine) => ({
-        id: routine.id,
-        name: routine.name,
-        triggerType: routine.triggerType,
-      })),
+      agenda: [],
+      tasks: [],
+      activeRoutines: [],
     };
   } catch (error) {
     console.error("Erreur dashboard:", error);
@@ -96,19 +52,27 @@ async function getDashboardData(userId: string) {
 }
 
 export default async function Dashboard() {
-  try {
-    const session = await getServerSession(authOptions);
+  // Récupérer l'utilisateur depuis Supabase Auth (vraie session)
+  // IMPORTANT: redirect() doit être appelé EN DEHORS de tout try/catch
+  // car redirect() lance une exception NEXT_REDIRECT qui doit être propagée
+  const user = await getCurrentUser();
 
-    if (!session?.user?.id) {
-      redirect("/auth/signin");
+  // Si pas d'utilisateur authentifié, rediriger vers la page de connexion
+  // Cette redirection ne doit PAS être dans un try/catch
+  if (!user) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log("[DASHBOARD] Aucun utilisateur trouvé, redirection vers /auth/signin");
     }
+    redirect("/auth/signin");
+  }
 
+  // Reste du code dans un try/catch pour gérer les erreurs métier
+  try {
     // Essayer de récupérer les données, mais continuer même si ça échoue
     let brief: Awaited<ReturnType<typeof getDashboardData>>;
-    let displayName: string;
     
     try {
-      brief = await getDashboardData(session.user.id);
+      brief = await getDashboardData(user.id);
     } catch (error) {
       console.error("[DASHBOARD] Erreur getDashboardData:", error);
       brief = {
@@ -116,13 +80,6 @@ export default async function Dashboard() {
         tasks: [],
         activeRoutines: [],
       };
-    }
-
-    try {
-      displayName = await getUserDisplayName(session.user.id);
-    } catch (error) {
-      console.error("[DASHBOARD] Erreur getUserDisplayName:", error);
-      displayName = session.user.name || session.user.email || "Utilisateur";
     }
     
     const currentDate = new Date();
@@ -147,10 +104,8 @@ export default async function Dashboard() {
                       {formattedDate}
                     </span>
                   </div>
-                  <h1 className="text-4xl sm:text-5xl font-bold mb-2 text-[hsl(var(--text))] dark:text-[hsl(var(--text))]">
-                    Bonjour {displayName}{" "}
-                    <span className="inline-block animate-wave">👋</span>
-                  </h1>
+                  {/* Affichage du nom complet : "Bonjour Prénom Nom" */}
+                  <UserGreeting user={user} variant="full" />
                   <p className="text-lg text-[hsl(var(--text-secondary))] dark:text-[hsl(var(--text-secondary))] font-medium">
                     Voici votre aperçu personnalisé du jour
                   </p>
@@ -205,9 +160,25 @@ export default async function Dashboard() {
     </div>
   );
   } catch (error) {
+    // IMPORTANT: Ne PAS utiliser redirect() dans un catch car ça lance NEXT_REDIRECT
+    // Afficher plutôt un état d'erreur à l'utilisateur
     console.error("[DASHBOARD] Erreur critique:", error);
-    // En cas d'erreur, rediriger vers la page de connexion
-    redirect("/auth/signin?error=dashboard_error");
+    
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <h1 className="text-2xl font-bold">Erreur</h1>
+          <p className="text-muted-foreground">
+            Une erreur est survenue lors du chargement du dashboard.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            <a href="/auth/signin" className="text-primary underline">
+              Retourner à la page de connexion
+            </a>
+          </p>
+        </div>
+      </div>
+    );
   }
 }
 

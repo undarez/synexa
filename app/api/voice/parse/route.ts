@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
+import { requireUser } from "@/app/lib/auth/mock";
 import { parseVoiceCommand } from "@/app/lib/ai/voice-commands";
 import { trackActivity } from "@/app/lib/learning/tracker";
 

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Prisma } from "@prisma/client";
-import { RoutineActionType, RoutineTriggerType } from "@prisma/client";
-import prisma from "@/app/lib/prisma";
-import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
-import { toJsonInput } from "@/app/lib/prisma/json";
+import { RoutineActionType, RoutineTriggerType } from "@/app/lib/supabase/types";
+import { supabase } from "@/app/lib/supabase/client";
+import { requireUser, UnauthorizedError } from "@/app/lib/auth/mock";
+import { generateId } from "@/app/lib/supabase/helpers";
 
 type RoutineStepInput = {
   actionType: RoutineActionType;
@@ -45,58 +44,121 @@ export async function PATCH(
     const { routineId } = await params;
     const body = (await request.json()) as RoutinePayload;
 
-    const routine = await prisma.routine.findFirst({
-      where: { id: routineId, userId: user.id },
-      include: { steps: true },
-    });
-    if (!routine) {
+    // Récupérer la routine avec ses steps
+    const { data: routine, error: fetchError } = await supabase
+      .from('Routine')
+      .select(`
+        *,
+        steps:RoutineStep(*)
+      `)
+      .eq('id', routineId)
+      .eq('userId', user.id)
+      .single();
+
+    if (fetchError || !routine) {
       return NextResponse.json({ error: "Routine introuvable" }, { status: 404 });
     }
 
-    const data: Prisma.RoutineUpdateInput = {};
-    if (body.name !== undefined) data.name = body.name;
-    if (body.description !== undefined) data.description = body.description;
-    if (body.active !== undefined) data.active = body.active;
-    if (body.triggerType !== undefined) data.triggerType = body.triggerType;
-    if (body.triggerData !== undefined) data.triggerData = toJsonInput(body.triggerData);
+    // Construire l'objet de mise à jour
+    const updateData: {
+      name?: string;
+      description?: string | null;
+      active?: boolean;
+      triggerType?: RoutineTriggerType;
+      triggerData?: any;
+      updatedAt: string;
+    } = {
+      updatedAt: new Date().toISOString(),
+    };
 
-    const updates = [];
-    updates.push(
-      prisma.routine.update({
-        where: { id: routine.id },
-        data,
-      })
-    );
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.description !== undefined) updateData.description = body.description;
+    if (body.active !== undefined) updateData.active = body.active;
+    if (body.triggerType !== undefined) updateData.triggerType = body.triggerType;
+    if (body.triggerData !== undefined) updateData.triggerData = body.triggerData;
 
+    // Mettre à jour la routine
+    const { error: updateError } = await supabase
+      .from('Routine')
+      // @ts-expect-error - Le type Database.Update est any, mais TypeScript ne l'infère pas correctement
+      .update(updateData)
+      .eq('id', routine.id)
+      .eq('userId', user.id);
+
+    if (updateError) {
+      console.error('[PATCH /routines/:id] Erreur mise à jour routine:', updateError);
+      return NextResponse.json(
+        { error: 'Erreur lors de la mise à jour de la routine', details: updateError.message },
+        { status: 500 }
+      );
+    }
+
+    // Gérer les steps si fournis
     if (body.steps) {
       const steps = normalizeSteps(body.steps);
-      updates.push(
-        prisma.routineStep.deleteMany({ where: { routineId: routine.id } })
-      );
+      
+      // Supprimer les anciens steps
+      const { error: deleteError } = await supabase
+        .from('RoutineStep')
+        .delete()
+        .eq('routineId', routine.id);
+
+      if (deleteError) {
+        console.error('[PATCH /routines/:id] Erreur suppression steps:', deleteError);
+      }
+
+      // Créer les nouveaux steps
       if (steps.length > 0) {
-        updates.push(
-          prisma.routineStep.createMany({
-            data: steps.map((step) => ({
+        const { error: createStepsError } = await supabase
+          .from('RoutineStep')
+          .insert(
+            steps.map((step) => ({
+              id: generateId(),
               routineId: routine.id,
               order: step.order ?? 0,
               actionType: step.actionType,
-              payload: toJsonInput(step.payload),
-              deviceId: step.deviceId,
-              delaySeconds: step.delaySeconds,
-            })),
-          })
-        );
+              payload: step.payload ?? null,
+              deviceId: step.deviceId ?? null,
+              delaySeconds: step.delaySeconds ?? null,
+            }))
+          );
+
+        if (createStepsError) {
+          console.error('[PATCH /routines/:id] Erreur création steps:', createStepsError);
+          return NextResponse.json(
+            { error: 'Erreur lors de la mise à jour des étapes', details: createStepsError.message },
+            { status: 500 }
+          );
+        }
       }
     }
 
-    await prisma.$transaction(updates);
+    // Récupérer la routine complète mise à jour
+    const { data: updated, error: fetchUpdatedError } = await supabase
+      .from('Routine')
+      .select(`
+        *,
+        steps:RoutineStep(*),
+        logs:RoutineLog(*)
+      `)
+      .eq('id', routine.id)
+      .single();
 
-    const updated = await prisma.routine.findUnique({
-      where: { id: routine.id },
-      include: { steps: { orderBy: { order: "asc" } }, logs: true },
-    });
+    if (fetchUpdatedError || !updated) {
+      console.error('[PATCH /routines/:id] Erreur récupération routine mise à jour:', fetchUpdatedError);
+      return NextResponse.json(
+        { error: 'Erreur lors de la récupération de la routine mise à jour' },
+        { status: 500 }
+      );
+    }
 
-    return NextResponse.json({ routine: updated });
+    // Trier les steps
+    const sortedRoutine = {
+      ...updated,
+      steps: (updated.steps || []).sort((a: any, b: any) => (a.order || 0) - (b.order || 0)),
+    };
+
+    return NextResponse.json({ routine: sortedRoutine });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: error.message }, { status: 401 });
@@ -116,14 +178,32 @@ export async function DELETE(
   try {
     const user = await requireUser();
     const { routineId } = await params;
-    const routine = await prisma.routine.findFirst({
-      where: { id: routineId, userId: user.id },
-    });
-    if (!routine) {
+    // Vérifier que la routine existe
+    const { data: routine, error: fetchError } = await supabase
+      .from('Routine')
+      .select('id')
+      .eq('id', routineId)
+      .eq('userId', user.id)
+      .single();
+
+    if (fetchError || !routine) {
       return NextResponse.json({ error: "Routine introuvable" }, { status: 404 });
     }
 
-    await prisma.routine.delete({ where: { id: routine.id } });
+    // Supprimer la routine (les steps seront supprimés automatiquement via CASCADE si configuré)
+    const { error: deleteError } = await supabase
+      .from('Routine')
+      .delete()
+      .eq('id', routine.id)
+      .eq('userId', user.id);
+
+    if (deleteError) {
+      console.error('[DELETE /routines/:id] Erreur Supabase:', deleteError);
+      return NextResponse.json(
+        { error: 'Erreur lors de la suppression de la routine', details: deleteError.message },
+        { status: 500 }
+      );
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof UnauthorizedError) {

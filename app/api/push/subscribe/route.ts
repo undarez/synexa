@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
-import prisma from "@/app/lib/prisma";
+import { requireUser } from "@/app/lib/auth/mock";
+import { supabase } from "@/app/lib/supabase/client";
 
 /**
  * Enregistre une subscription push pour l'utilisateur
@@ -20,30 +20,49 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const now = new Date().toISOString();
+    
     // Vérifier si la subscription existe déjà
-    const existing = await prisma.pushSubscription.findUnique({
-      where: { endpoint },
-    });
+    const { data: existing } = await supabase
+      .from('PushSubscription')
+      .select('id')
+      .eq('endpoint', endpoint)
+      .single();
 
     if (existing) {
       // Mettre à jour si elle existe déjà
-      await prisma.pushSubscription.update({
-        where: { endpoint },
-        data: {
+      const { error: updateError } = await supabase
+        .from('PushSubscription')
+        .update({
           p256dh: keys.p256dh,
           auth: keys.auth,
-        },
-      });
+          updatedAt: now,
+        })
+        .eq('endpoint', endpoint);
+
+      if (updateError) {
+        console.error('[POST /push/subscribe] Erreur mise à jour:', updateError);
+      }
     } else {
       // Créer une nouvelle subscription
-      await prisma.pushSubscription.create({
-        data: {
+      const { error: createError } = await supabase
+        .from('PushSubscription')
+        .insert({
           userId: user.id,
           endpoint,
           p256dh: keys.p256dh,
           auth: keys.auth,
-        },
-      });
+          createdAt: now,
+          updatedAt: now,
+        });
+
+      if (createError) {
+        console.error('[POST /push/subscribe] Erreur création:', createError);
+        return NextResponse.json(
+          { error: 'Erreur lors de la création de la subscription', details: createError.message },
+          { status: 500 }
+        );
+      }
     }
 
     console.log(`[Push] Subscription enregistrée pour ${user.email}`);
@@ -79,12 +98,15 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Supprimer la subscription de la base de données
-    await prisma.pushSubscription.deleteMany({
-      where: {
-        userId: user.id,
-        endpoint,
-      },
-    });
+    const { error } = await supabase
+      .from('PushSubscription')
+      .delete()
+      .eq('userId', user.id)
+      .eq('endpoint', endpoint);
+
+    if (error) {
+      console.error('[DELETE /push/subscribe] Erreur:', error);
+    }
 
     console.log(`[Push] Subscription supprimée pour ${user.email}`);
 

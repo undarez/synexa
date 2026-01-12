@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
+import { requireUser, UnauthorizedError } from "@/app/lib/auth/mock";
 import { dispatchDeviceCommand } from "@/app/lib/routines/transport";
-import prisma from "@/app/lib/prisma";
+import { supabase } from "@/app/lib/supabase/client";
 
 export async function POST(
   request: NextRequest,
@@ -10,19 +10,26 @@ export async function POST(
   try {
     const user = await requireUser();
     const { deviceId } = await params;
-    const device = await prisma.device.findFirst({
-      where: { id: deviceId, userId: user.id },
-    });
-    if (!device) {
+    type DeviceData = { id: string; [key: string]: unknown };
+    const { data: device, error: deviceError } = await supabase
+      .from('Device')
+      .select('*')
+      .eq('id', deviceId)
+      .eq('userId', user.id)
+      .single();
+
+    if (deviceError || !device) {
       return NextResponse.json({ error: "Appareil introuvable" }, { status: 404 });
     }
+
+    const typedDevice = device as DeviceData;
 
     const body = (await request.json().catch(() => ({}))) as {
       action?: string;
       payload?: Record<string, unknown>;
     };
 
-    const response = await dispatchDeviceCommand(device.id, {
+    const response = await dispatchDeviceCommand(typedDevice.id, {
       action: body.action,
       payload: body.payload,
     });

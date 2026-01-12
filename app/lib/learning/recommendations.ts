@@ -3,8 +3,8 @@
  * Utilise les patterns appris pour suggérer des actions adaptées
  */
 
-import prisma from "@/app/lib/prisma";
-import { UserLearning } from "@prisma/client";
+import { supabase } from "@/app/lib/supabase/client";
+import type { UserLearning } from "@/app/lib/supabase/types";
 import { detectPatterns } from "./patterns";
 import { analyzeRecentPatterns } from "./tracker";
 
@@ -30,20 +30,26 @@ export async function getPersonalizedRecommendations(
   const recommendations: PersonalizedRecommendation[] = [];
 
   // Récupérer les patterns appris
-  const learnedPatterns = await prisma.userLearning.findMany({
-    where: { userId },
-    orderBy: [{ confidence: "desc" }, { frequency: "desc" }],
-  });
+  const { data: learnedPatterns, error: patternsError } = await supabase
+    .from('UserLearning')
+    .select('*')
+    .eq('userId', userId)
+    .order('confidence', { ascending: false })
+    .order('frequency', { ascending: false });
+
+  if (patternsError) {
+    console.error("[Recommendations] Erreur récupération patterns:", patternsError);
+  }
 
   // Analyser les patterns récents
   const recentPatterns = await analyzeRecentPatterns(userId, 7);
 
   // Recommandation 1: Tâches récurrentes suggérées
-  const recurringTaskPatterns = learnedPatterns.filter(
-    (p: UserLearning) => p.category === "task" && p.pattern.startsWith("recurring_task:")
+  const recurringTaskPatterns = (learnedPatterns || []).filter(
+    (p: any) => p.category === "task" && p.pattern?.startsWith("recurring_task:")
   );
 
-  recurringTaskPatterns.forEach((pattern: UserLearning) => {
+  recurringTaskPatterns.forEach((pattern: any) => {
     const metadata = pattern.metadata as any;
     if (metadata && metadata.count >= 3) {
       recommendations.push({
@@ -67,8 +73,8 @@ export async function getPersonalizedRecommendations(
   });
 
   // Recommandation 2: Optimisation des heures de travail
-  const preferredHoursPattern = learnedPatterns.find(
-    (p: UserLearning) => p.category === "task" && p.pattern === "preferred_hours"
+  const preferredHoursPattern = (learnedPatterns || []).find(
+    (p: any) => p.category === "task" && p.pattern === "preferred_hours"
   );
 
   if (preferredHoursPattern) {
@@ -90,11 +96,11 @@ export async function getPersonalizedRecommendations(
   }
 
   // Recommandation 3: Routines suggérées
-  const frequentRoutinePatterns = learnedPatterns.filter(
-    (p: UserLearning) => p.category === "routine" && p.pattern.startsWith("frequent_routine:")
+  const frequentRoutinePatterns = (learnedPatterns || []).filter(
+    (p: any) => p.category === "routine" && p.pattern?.startsWith("frequent_routine:")
   );
 
-  frequentRoutinePatterns.forEach((pattern: UserLearning) => {
+  frequentRoutinePatterns.forEach((pattern: any) => {
     const metadata = pattern.metadata as any;
     if (metadata && metadata.executionCount >= 5) {
       const routineHour = metadata.preferredHour;
@@ -160,29 +166,33 @@ export async function adaptSuggestions(
   userId: string,
   suggestionType: "task" | "event" | "reminder"
 ): Promise<any> {
-  const learnedPatterns = await prisma.userLearning.findMany({
-    where: {
-      userId,
-      category: suggestionType,
-    },
-    orderBy: [{ confidence: "desc" }, { frequency: "desc" }],
-  });
+  const { data: learnedPatterns, error: patternsError } = await supabase
+    .from('UserLearning')
+    .select('*')
+    .eq('userId', userId)
+    .eq('category', suggestionType)
+    .order('confidence', { ascending: false })
+    .order('frequency', { ascending: false });
+
+  if (patternsError) {
+    console.error("[Adapt Suggestions] Erreur récupération patterns:", patternsError);
+  }
 
   const adaptations: Record<string, any> = {};
 
   // Adapter les suggestions de tâches
   if (suggestionType === "task") {
-    const preferredContexts = learnedPatterns
-      .filter((p: UserLearning) => p.pattern === "preferred_contexts")
-      .map((p: UserLearning) => (p.metadata as any)?.contexts || [])
+    const preferredContexts = (learnedPatterns || [])
+      .filter((p: any) => p.pattern === "preferred_contexts")
+      .map((p: any) => (p.metadata as any)?.contexts || [])
       .flat();
 
     if (preferredContexts.length > 0) {
       adaptations.suggestedContexts = preferredContexts.slice(0, 3);
     }
 
-    const preferredHours = learnedPatterns
-      .find((p: UserLearning) => p.pattern === "preferred_hours")
+    const preferredHours = (learnedPatterns || [])
+      .find((p: any) => p.pattern === "preferred_hours")
       ?.metadata as any;
 
     if (preferredHours?.hours) {

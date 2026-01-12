@@ -5,12 +5,12 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/app/lib/prisma";
+import { supabase } from "@/app/lib/supabase/client";
 import { decryptSiceaData } from "@/app/lib/encryption/sicea-encryption";
 import { scrapeSiceaConsumption } from "@/app/lib/services/sicea-scraper";
 import { syncAllHealthSources } from "@/app/lib/health/sync";
 import { sendReminderNotification } from "@/app/lib/reminders/notifications";
-import { ReminderStatus } from "@prisma/client";
+import { ReminderStatus } from "@/app/lib/supabase/types";
 import { logger } from "@/app/lib/logger";
 import { subDays } from "date-fns";
 import {
@@ -38,18 +38,25 @@ export async function POST(request: NextRequest) {
 
     // 1. Scraping SICEA (une fois par jour)
     try {
-      const activeCredentials = await prisma.siceaCredentials.findMany({
-        where: { isActive: true, consentGiven: true },
-        include: { user: { select: { id: true } } },
-      });
+      const { data: activeCredentials, error: credentialsError } = await supabase
+        .from('SiceaCredentials')
+        .select('*')
+        .eq('isActive', true)
+        .eq('consentGiven', true);
 
+      if (credentialsError) {
+        logger.error("Erreur récupération credentials SICEA", credentialsError);
+      }
+
+      type SiceaCredentialsData = { username: string; password: string; contractNumber: string | null; userId: string; id: string; [key: string]: unknown };
       let siceaProcessed = 0;
-      for (const credentials of activeCredentials) {
+      for (const credentials of (activeCredentials || [])) {
+        const typedCredentials = credentials as SiceaCredentialsData;
         try {
           const decrypted = decryptSiceaData({
-            username: credentials.username,
-            password: credentials.password,
-            contractNumber: credentials.contractNumber,
+            username: typedCredentials.username,
+            password: typedCredentials.password,
+            contractNumber: typedCredentials.contractNumber,
           });
 
           if (decrypted.username && decrypted.password) {
@@ -65,49 +72,40 @@ export async function POST(request: NextRequest) {
             );
 
             if (scrapeResult.success && scrapeResult.data) {
+              const now = new Date().toISOString();
+              
               // Sauvegarder les données
-              for (const consumption of scrapeResult.data) {
-                await prisma.energyConsumption.upsert({
-                  where: {
-                    userId_date: {
-                      userId: credentials.userId,
-                      date: new Date(consumption.date),
-                    },
-                  },
-                  update: {
-                    value: consumption.consumption,
-                    cost: consumption.cost,
-                    peakHours: consumption.peakHours,
-                    offPeakHours: consumption.offPeakHours,
-                    source: "sicea",
-                    metadata: {
-                      maxPower: consumption.maxPower,
-                      halfHourlyData: consumption.halfHourlyData,
-                    },
-                  },
-                  create: {
-                    userId: credentials.userId,
-                    date: new Date(consumption.date),
-                    value: consumption.consumption,
-                    cost: consumption.cost,
-                    peakHours: consumption.peakHours,
-                    offPeakHours: consumption.offPeakHours,
-                    source: "sicea",
-                    metadata: {
-                      maxPower: consumption.maxPower,
-                      halfHourlyData: consumption.halfHourlyData,
-                    },
-                  },
-                });
-              }
-
-              await prisma.siceaCredentials.update({
-                where: { id: credentials.id },
-                data: {
-                  lastScrapedAt: new Date(),
-                  lastError: null,
+              const consumptionsToUpsert = scrapeResult.data.map((consumption) => ({
+                userId: typedCredentials.userId,
+                date: new Date(consumption.date).toISOString(),
+                value: consumption.consumption,
+                cost: consumption.cost,
+                peakHours: consumption.peakHours,
+                offPeakHours: consumption.offPeakHours,
+                source: "sicea",
+                metadata: {
+                  maxPower: consumption.maxPower,
+                  halfHourlyData: consumption.halfHourlyData,
                 },
-              });
+                updatedAt: now,
+              }));
+
+              // @ts-ignore - Supabase infère 'never' mais les données sont valides
+              await supabase
+                .from('EnergyConsumption')
+                .upsert(consumptionsToUpsert as any, {
+                  onConflict: 'userId,date',
+                });
+
+              await supabase
+                .from('SiceaCredentials')
+                // @ts-ignore - Supabase infère 'never' mais les données sont valides
+                .update({
+                  lastScrapedAt: now,
+                  lastError: null,
+                  updatedAt: now,
+                } as any)
+                .eq('id', typedCredentials.id);
 
               siceaProcessed++;
             }
@@ -120,7 +118,7 @@ export async function POST(request: NextRequest) {
       results.sicea = {
         success: true,
         usersProcessed: siceaProcessed,
-        totalCredentials: activeCredentials.length,
+        totalCredentials: activeCredentials?.length || 0,
       };
     } catch (error) {
       results.sicea = {
@@ -131,31 +129,41 @@ export async function POST(request: NextRequest) {
 
     // 2. Sync santé (une fois par jour)
     try {
-      const users = await prisma.user.findMany({
-        where: {
-          preferences: {
-            some: {
-              key: {
-                in: [
-                  "health_sync_apple_health",
-                  "health_sync_fitbit",
-                  "health_sync_withings",
-                  "health_sync_google_fit",
-                ],
-              },
-              value: {
-                path: ["enabled"],
-                equals: true,
-              } as any,
-            },
-          },
-        },
-      });
+      // Récupérer les utilisateurs avec préférences de sync santé
+      const { data: healthPreferences, error: prefsError } = await supabase
+        .from('Preference')
+        .select('userId')
+        .in('key', [
+          "health_sync_apple_health",
+          "health_sync_fitbit",
+          "health_sync_withings",
+          "health_sync_google_fit",
+        ])
+        .eq('value->>enabled', 'true');
 
+      if (prefsError) {
+        logger.error("Erreur récupération préférences santé", prefsError);
+      }
+
+      // Extraire les userId uniques
+      const userIds = [...new Set((healthPreferences || []).map((p: any) => p.userId))];
+      
+      // Récupérer les utilisateurs
+      const { data: users, error: usersError } = await supabase
+        .from('User')
+        .select('id')
+        .in('id', userIds);
+
+      if (usersError) {
+        logger.error("Erreur récupération utilisateurs", usersError);
+      }
+
+      type UserWithId = { id: string; [key: string]: unknown };
       let healthProcessed = 0;
-      for (const user of users) {
+      for (const user of (users || [])) {
+        const typedUser = user as UserWithId;
         try {
-          await syncAllHealthSources(user.id);
+          await syncAllHealthSources(typedUser.id);
           healthProcessed++;
         } catch (error) {
           logger.error("Erreur sync santé pour un utilisateur", error);
@@ -165,7 +173,7 @@ export async function POST(request: NextRequest) {
       results.health = {
         success: true,
         usersProcessed: healthProcessed,
-        totalUsers: users.length,
+        totalUsers: users?.length || 0,
       };
     } catch (error) {
       results.health = {
@@ -177,28 +185,35 @@ export async function POST(request: NextRequest) {
     // 3. Traitement des rappels (une fois par jour)
     try {
       const now = new Date();
-      const pendingReminders = await prisma.reminder.findMany({
-        where: {
-          status: ReminderStatus.PENDING,
-          scheduledFor: { lte: now },
-        },
-        include: {
-          user: true,
-          calendarEvent: true,
-        },
-      });
+      const { data: pendingReminders, error: remindersError } = await supabase
+        .from('Reminder')
+        .select(`
+          *,
+          user:User(*),
+          calendarEvent:CalendarEvent(*)
+        `)
+        .eq('status', ReminderStatus.PENDING)
+        .lte('scheduledFor', now.toISOString());
 
+      if (remindersError) {
+        logger.error("Erreur récupération rappels", remindersError);
+      }
+
+      type ReminderData = { id: string; [key: string]: unknown };
       let remindersSent = 0;
-      for (const reminder of pendingReminders) {
+      for (const reminder of (pendingReminders || [])) {
+        const typedReminder = reminder as ReminderData;
         try {
-          await sendReminderNotification(reminder.id);
-          await prisma.reminder.update({
-            where: { id: reminder.id },
-            data: {
+          await sendReminderNotification(typedReminder.id);
+          await supabase
+            .from('Reminder')
+            // @ts-ignore - Supabase infère 'never' mais les données sont valides
+            .update({
               status: ReminderStatus.SENT,
-              sentAt: new Date(),
-            },
-          });
+              sentAt: now.toISOString(),
+              updatedAt: now.toISOString(),
+            } as any)
+            .eq('id', typedReminder.id);
           remindersSent++;
         } catch (error) {
           logger.error("Erreur envoi rappel", error);
@@ -208,7 +223,7 @@ export async function POST(request: NextRequest) {
       results.reminders = {
         success: true,
         processed: remindersSent,
-        total: pendingReminders.length,
+        total: pendingReminders?.length || 0,
       };
     } catch (error) {
       results.reminders = {
@@ -219,17 +234,31 @@ export async function POST(request: NextRequest) {
 
     // 4. Sync calendrier Google (une fois par jour)
     try {
-      const usersWithGoogle = await prisma.user.findMany({
-        where: {
-          accounts: {
-            some: {
-              provider: "google",
-              access_token: { not: null },
-            },
-          },
-        },
-        select: { id: true },
-      });
+      // TODO: Récupérer les utilisateurs avec compte Google (nécessitera Supabase Auth)
+      // Pour l'instant, on récupère tous les utilisateurs et on vérifie le token
+      const { data: allUsers, error: usersError } = await supabase
+        .from('User')
+        .select('id')
+        .limit(1000); // Limite raisonnable
+
+      if (usersError) {
+        logger.error("Erreur récupération utilisateurs", usersError);
+      }
+
+      // Filtrer ceux qui ont un token Google valide
+      type UserWithId = { id: string; [key: string]: unknown };
+      const usersWithGoogle: UserWithId[] = [];
+      for (const user of (allUsers || [])) {
+        const typedUser = user as UserWithId;
+        try {
+          const hasToken = await getGoogleCalendarToken(typedUser.id);
+          if (hasToken) {
+            usersWithGoogle.push(typedUser);
+          }
+        } catch (error) {
+          // Ignorer les erreurs de token
+        }
+      }
 
       let calendarProcessed = 0;
       for (const user of usersWithGoogle) {
@@ -246,39 +275,51 @@ export async function POST(request: NextRequest) {
             });
 
             // Sauvegarder les événements
+            const now = new Date().toISOString();
             for (const event of events) {
               const internalEvent = convertGoogleEventToInternal(event, user.id);
               if (internalEvent.externalId) {
                 // Chercher si l'événement existe déjà
-                const existing = await prisma.calendarEvent.findFirst({
-                  where: {
-                    userId: user.id,
-                    externalId: internalEvent.externalId,
-                  },
-                });
+                type ExistingEvent = { id: string };
+                const { data: existing } = await supabase
+                  .from('CalendarEvent')
+                  .select('id')
+                  .eq('userId', user.id)
+                  .eq('externalId', internalEvent.externalId)
+                  .single();
 
-                if (existing) {
+                const typedExisting = existing as ExistingEvent | null;
+                if (typedExisting) {
                   // Mettre à jour
-                  await prisma.calendarEvent.update({
-                    where: { id: existing.id },
-                    data: {
+                  await supabase
+                    .from('CalendarEvent')
+                    // @ts-ignore - Supabase infère 'never' mais les données sont valides
+                    .update({
                       title: internalEvent.title,
-                      description: internalEvent.description,
-                      location: internalEvent.location,
-                      start: internalEvent.start,
-                      end: internalEvent.end,
+                      description: internalEvent.description || null,
+                      location: internalEvent.location || null,
+                      start: internalEvent.start.toISOString(),
+                      end: internalEvent.end.toISOString(),
                       allDay: internalEvent.allDay,
-                      metadata: internalEvent.metadata,
-                    },
-                  });
+                      metadata: internalEvent.metadata || null,
+                      updatedAt: now,
+                    } as any)
+                    .eq('id', typedExisting.id);
                 } else {
                   // Créer
-                  await prisma.calendarEvent.create({
-                    data: {
+                  // @ts-ignore - Supabase infère 'never' mais les données sont valides
+                  await supabase
+                    .from('CalendarEvent')
+                    .insert({
                       ...internalEvent,
                       externalId: internalEvent.externalId,
-                    },
-                  });
+                      start: internalEvent.start.toISOString(),
+                      end: internalEvent.end.toISOString(),
+                      reminders: internalEvent.reminders || null,
+                      metadata: internalEvent.metadata || null,
+                      createdAt: now,
+                      updatedAt: now,
+                    } as any);
                 }
               }
             }

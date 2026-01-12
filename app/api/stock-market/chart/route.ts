@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
+import { requireUser } from "@/app/lib/auth/mock";
 
 /**
  * GET - Récupère les données de graphique pour un symbole
@@ -83,6 +83,9 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+
+
 
 
 

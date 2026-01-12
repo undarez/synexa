@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { signOut, useSession } from "next-auth/react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/app/lib/auth/use-auth";
 import Link from "next/link";
 import {
   Avatar,
@@ -47,8 +47,14 @@ const isAdminClient = (email: string | null | undefined): boolean => {
 };
 
 export function Navigation() {
-  const { data: session } = useSession();
+  const { user, loading, signInWithGoogle, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Éviter l'erreur d'hydratation en ne rendant les DropdownMenu qu'après le montage
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <>
@@ -78,6 +84,7 @@ export function Navigation() {
               >
                 Dashboard
               </Link>
+              {mounted ? (
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex items-center gap-1 text-sm font-medium text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--primary))]">
                   Organisation
@@ -104,6 +111,13 @@ export function Navigation() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              ) : (
+                <button className="flex items-center gap-1 text-sm font-medium text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--primary))]">
+                  Organisation
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              )}
+              {mounted ? (
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex items-center gap-1 text-sm font-medium text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--primary))]">
                   Domotique
@@ -142,6 +156,12 @@ export function Navigation() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              ) : (
+                <button className="flex items-center gap-1 text-sm font-medium text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--primary))]">
+                  Domotique
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              )}
               <Link
                 href="/news"
                 className="flex items-center gap-1 text-sm font-medium text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--primary))]"
@@ -149,6 +169,7 @@ export function Navigation() {
                 <Newspaper className="h-4 w-4" />
                 Actualités
               </Link>
+              {mounted ? (
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex items-center gap-1 text-sm font-medium text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--primary))]">
                   Environnement
@@ -175,6 +196,13 @@ export function Navigation() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              ) : (
+                <button className="flex items-center gap-1 text-sm font-medium text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--primary))]">
+                  Environnement
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              )}
+              {mounted ? (
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex items-center gap-1 text-sm font-medium text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--primary))]">
                   Bien-être
@@ -195,6 +223,12 @@ export function Navigation() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              ) : (
+                <button className="flex items-center gap-1 text-sm font-medium text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--primary))]">
+                  Bien-être
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              )}
             </nav>
           </div>
           <div className="flex items-center gap-4">
@@ -213,61 +247,99 @@ export function Navigation() {
               </Link>
             </nav>
             <ThemeToggle />
-            {session?.user && (
-              <DropdownMenu>
-                <DropdownMenuTrigger className="flex items-center gap-3 focus:outline-none">
-                  <Avatar>
-                    <AvatarImage
-                      src={session.user.image || undefined}
-                      alt={session.user.name || "User"}
-                    />
-                    <AvatarFallback>
-                      {session.user.name?.charAt(0).toUpperCase() ||
-                        session.user.email?.charAt(0).toUpperCase() ||
-                        "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="hidden text-sm text-[hsl(var(--foreground))] sm:inline">
-                    {session.user.name || session.user.email}
-                  </span>
-                  <ChevronDown className="hidden h-4 w-4 text-[hsl(var(--muted-foreground))] sm:inline" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuLabel>
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">
-                        {session.user.name || "Utilisateur"}
-                      </p>
-                      <p className="text-xs leading-none text-[hsl(var(--muted-foreground))]">
-                        {session.user.email}
-                      </p>
+            {!loading && (
+              <>
+                {user ? (
+                  mounted ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger className="flex items-center gap-3 focus:outline-none">
+                        <Avatar>
+                          <AvatarImage
+                            src={user.user_metadata?.avatar_url || undefined}
+                            alt={user.user_metadata?.full_name || user.email || "User"}
+                          />
+                          <AvatarFallback>
+                            {user.user_metadata?.full_name?.charAt(0).toUpperCase() ||
+                              user.email?.charAt(0).toUpperCase() ||
+                              "U"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="hidden text-sm text-[hsl(var(--foreground))] sm:inline">
+                          {user.user_metadata?.full_name || user.email}
+                        </span>
+                        <ChevronDown className="hidden h-4 w-4 text-[hsl(var(--muted-foreground))] sm:inline" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuLabel>
+                          <div className="flex flex-col space-y-1">
+                            <p className="text-sm font-medium leading-none">
+                              {user.user_metadata?.full_name || "Utilisateur"}
+                            </p>
+                            <p className="text-xs leading-none text-[hsl(var(--muted-foreground))]">
+                              {user.email}
+                            </p>
+                          </div>
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild>
+                          <Link href="/profile" className="flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            Profil
+                          </Link>
+                        </DropdownMenuItem>
+                        {user.email && isAdminClient(user.email) && (
+                          <DropdownMenuItem asChild>
+                            <Link href="/admin" className="flex items-center gap-2">
+                              <Shield className="h-4 w-4" />
+                              Administration
+                            </Link>
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={signOut}
+                          className="flex items-center gap-2 text-[hsl(var(--destructive))] focus:text-[hsl(var(--destructive))]"
+                        >
+                          <LogOut className="h-4 w-4" />
+                          Déconnexion
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <Avatar>
+                        <AvatarFallback>
+                          {user.user_metadata?.full_name?.charAt(0).toUpperCase() ||
+                            user.email?.charAt(0).toUpperCase() ||
+                            "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="hidden text-sm text-[hsl(var(--foreground))] sm:inline">
+                        {user.user_metadata?.full_name || user.email}
+                      </span>
                     </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/profile" className="flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      Profil
-                    </Link>
-                  </DropdownMenuItem>
-                  {session.user.email && isAdminClient(session.user.email) && (
-                    <DropdownMenuItem asChild>
-                      <Link href="/admin" className="flex items-center gap-2">
-                        <Shield className="h-4 w-4" />
-                        Administration
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => signOut({ callbackUrl: "/auth/signin" })}
-                    className="flex items-center gap-2 text-[hsl(var(--destructive))] focus:text-[hsl(var(--destructive))]"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Déconnexion
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  )
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={signInWithGoogle}
+                      className="hidden sm:flex"
+                    >
+                      Se connecter avec Google
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={signInWithGoogle}
+                      className="sm:hidden"
+                    >
+                      Connexion
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -451,45 +523,62 @@ export function Navigation() {
             </div>
           </nav>
 
-          {session?.user && (
-            <div className="mt-8 space-y-2 border-t border-[hsl(var(--border))] pt-4">
-              <div className="px-3 py-2">
-                <p className="text-sm font-medium text-[hsl(var(--foreground))]">
-                  {session.user.name || "Utilisateur"}
-                </p>
-                <p className="text-xs text-[hsl(var(--muted-foreground))]">
-                  {session.user.email}
-                </p>
-              </div>
-              <Link
-                href="/profile"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
-              >
-                <User className="h-5 w-5" />
-                Profil
-              </Link>
-              {session.user.email && isAdminClient(session.user.email) && (
-                <Link
-                  href="/admin"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
-                >
-                  <Shield className="h-5 w-5" />
-                  Administration
-                </Link>
+          {!loading && (
+            <>
+              {user ? (
+                <div className="mt-8 space-y-2 border-t border-[hsl(var(--border))] pt-4">
+                  <div className="px-3 py-2">
+                    <p className="text-sm font-medium text-[hsl(var(--foreground))]">
+                      {user.user_metadata?.full_name || "Utilisateur"}
+                    </p>
+                    <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                      {user.email}
+                    </p>
+                  </div>
+                  <Link
+                    href="/profile"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
+                  >
+                    <User className="h-5 w-5" />
+                    Profil
+                  </Link>
+                  {user.email && isAdminClient(user.email) && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
+                    >
+                      <Shield className="h-5 w-5" />
+                      Administration
+                    </Link>
+                  )}
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      signOut();
+                    }}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-[hsl(var(--destructive))] transition-colors hover:bg-[hsl(var(--destructive))]/10"
+                  >
+                    <LogOut className="h-5 w-5" />
+                    Déconnexion
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-8 space-y-2 border-t border-[hsl(var(--border))] pt-4">
+                  <Button
+                    variant="default"
+                    className="w-full"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      signInWithGoogle();
+                    }}
+                  >
+                    Se connecter avec Google
+                  </Button>
+                </div>
               )}
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  signOut({ callbackUrl: "/auth/signin" });
-                }}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-[hsl(var(--destructive))] transition-colors hover:bg-[hsl(var(--destructive))]/10"
-              >
-                <LogOut className="h-5 w-5" />
-                Déconnexion
-              </button>
-            </div>
+            </>
           )}
         </div>
       </SheetContent>

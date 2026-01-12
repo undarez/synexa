@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/app/lib/prisma";
+import { supabase } from "@/app/lib/supabase/client";
 import {
   getGoogleCalendarToken,
   fetchGoogleCalendarEvents,
@@ -30,20 +30,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Trouver le channel dans la base de données
-    const channel = await prisma.calendarChannel.findUnique({
-      where: { channelId },
-      include: { user: true },
-    });
+    const { data: channel, error: channelError } = await supabase
+      .from('CalendarChannel')
+      .select(`
+        *,
+        user:User(*)
+      `)
+      .eq('channelId', channelId)
+      .single();
 
     if (!channel) {
       console.warn(`[Webhook] Channel non trouvé: ${channelId}`);
       return NextResponse.json({ received: true });
     }
 
+    type CalendarChannelData = { resourceId: string; userId: string; calendarId: string; [key: string]: unknown };
+    const typedChannel = channel as CalendarChannelData;
+
     // Vérifier que le resource ID correspond
-    if (channel.resourceId !== resourceId) {
+    if (typedChannel.resourceId !== resourceId) {
       console.warn(
-        `[Webhook] Resource ID mismatch: ${channel.resourceId} vs ${resourceId}`
+        `[Webhook] Resource ID mismatch: ${typedChannel.resourceId} vs ${resourceId}`
       );
       return NextResponse.json({ received: true });
     }
@@ -51,13 +58,13 @@ export async function POST(request: NextRequest) {
     // Si c'est la première notification (sync), on synchronise tout
     // Sinon (exists), on synchronise seulement les changements récents
     if (resourceState === "sync") {
-      console.log(`[Webhook] Sync initial pour user ${channel.userId}`);
+      console.log(`[Webhook] Sync initial pour user ${typedChannel.userId}`);
       // Synchronisation complète
-      await syncUserCalendar(channel.userId, channel.calendarId);
+      await syncUserCalendar(typedChannel.userId, typedChannel.calendarId);
     } else if (resourceState === "exists") {
-      console.log(`[Webhook] Changement détecté pour user ${channel.userId}`);
+      console.log(`[Webhook] Changement détecté pour user ${typedChannel.userId}`);
       // Synchronisation des changements récents (dernières 24h)
-      await syncUserCalendar(channel.userId, channel.calendarId, 1);
+      await syncUserCalendar(typedChannel.userId, typedChannel.calendarId, 1);
     }
 
     // Retourner 200 OK pour confirmer la réception
@@ -102,34 +109,50 @@ async function syncUserCalendar(
         const eventData = convertGoogleEventToInternal(googleEvent, userId);
         eventData.calendarId = calendarId;
 
-        const existingEvent = await prisma.calendarEvent.findFirst({
-          where: {
-            userId,
-            externalId: googleEvent.id,
-            source: "GOOGLE",
-          },
-        });
+        type ExistingEventData = { id: string };
+        const { data: existingEvent } = await supabase
+          .from('CalendarEvent')
+          .select('id')
+          .eq('userId', userId)
+          .eq('externalId', googleEvent.id)
+          .eq('source', 'GOOGLE')
+          .single();
 
-        if (existingEvent) {
+        const now = new Date().toISOString();
+        const typedExistingEvent = existingEvent as ExistingEventData | null;
+
+        if (typedExistingEvent) {
           // Mettre à jour l'événement existant
-          await prisma.calendarEvent.update({
-            where: { id: existingEvent.id },
-            data: {
+          // @ts-ignore - Supabase infère 'never' mais les données sont valides
+          await supabase
+            .from('CalendarEvent')
+            // @ts-ignore
+            .update({
               title: eventData.title,
-              description: eventData.description,
-              location: eventData.location,
-              start: eventData.start,
-              end: eventData.end,
+              description: eventData.description || null,
+              location: eventData.location || null,
+              start: eventData.start.toISOString(),
+              end: eventData.end.toISOString(),
               allDay: eventData.allDay,
-              reminders: eventData.reminders as any,
-              metadata: eventData.metadata as any,
-            },
-          });
+              reminders: eventData.reminders || null,
+              metadata: eventData.metadata || null,
+              updatedAt: now,
+            } as any)
+            .eq('id', typedExistingEvent.id);
         } else {
           // Créer un nouvel événement
-          await prisma.calendarEvent.create({
-            data: eventData,
-          });
+          // @ts-ignore - Supabase infère 'never' mais les données sont valides
+          await supabase
+            .from('CalendarEvent')
+            .insert({
+              ...eventData,
+              start: eventData.start.toISOString(),
+              end: eventData.end.toISOString(),
+              reminders: eventData.reminders || null,
+              metadata: eventData.metadata || null,
+              createdAt: now,
+              updatedAt: now,
+            } as any);
         }
       } catch (error) {
         console.error(

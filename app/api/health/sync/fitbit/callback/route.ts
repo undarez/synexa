@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
+import { requireUser } from "@/app/lib/auth/mock";
 import { exchangeFitbitCode } from "@/app/lib/health/fitbit-oauth";
 import { setHealthSyncConfig } from "@/app/lib/health/sync";
 

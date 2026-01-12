@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
+import type { Database } from "@/app/lib/supabase/client";
 
 /**
  * Routes protégées nécessitant une authentification
@@ -34,11 +34,72 @@ const publicRoutes = [
   "/auth/signup",
   "/auth/error",
   "/contact",
-  "/api/auth",
   "/api/push/vapid-key",
 ];
 
 export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
+
+  // Créer un client Supabase avec @supabase/ssr pour synchroniser la session
+  // Ce client synchronise automatiquement la session de localStorage (client) vers les cookies HTTP (serveur)
+  const supabase = createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          // Mettre à jour les cookies de la requête et de la réponse
+          request.cookies.set({
+            name,
+            value,
+            ...options,
+          });
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          });
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+          });
+        },
+        remove(name: string, options: CookieOptions) {
+          // Supprimer les cookies de la requête et de la réponse
+          request.cookies.set({
+            name,
+            value: "",
+            ...options,
+          });
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          });
+          response.cookies.set({
+            name,
+            value: "",
+            ...options,
+          });
+        },
+      },
+    }
+  );
+
+  // Vérifier la session et la rafraîchir si nécessaire
+  // Cela synchronise automatiquement la session de localStorage vers les cookies HTTP
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const { pathname } = request.nextUrl;
 
   // Vérifier si la route est publique
@@ -48,7 +109,7 @@ export async function middleware(request: NextRequest) {
 
   // Si c'est une route publique, laisser passer
   if (isPublicRoute) {
-    return NextResponse.next();
+    return response;
   }
 
   // Vérifier si c'est une route protégée
@@ -56,23 +117,15 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith(route)
   );
 
-  if (isProtectedRoute) {
-    // Vérifier le token JWT
-    const token = await getToken({
-      req: request,
-      secret: process.env.NEXTAUTH_SECRET,
-    });
-
-    // Si pas de token, rediriger vers la page d'accueil
-    if (!token || !token.sub) {
-      const url = new URL("/", request.url);
-      url.searchParams.set("error", "auth_required");
-      url.searchParams.set("redirect", pathname);
-      return NextResponse.redirect(url);
-    }
+  // Si c'est une route protégée et qu'il n'y a pas d'utilisateur authentifié, rediriger vers la page de connexion
+  if (isProtectedRoute && !user) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/signin";
+    url.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(url);
   }
 
-  return NextResponse.next();
+  return response;
 }
 
 export const config = {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
+import { requireUser } from "@/app/lib/auth/mock";
 import {
   createBill,
   getBills,
@@ -8,7 +8,7 @@ import {
   getOverdueBills,
   updateBillsStatus,
 } from "@/app/lib/finance/bills";
-import { BillStatus, BillCategory } from "@prisma/client";
+import { BillStatus, BillCategory } from "@/app/lib/supabase/types";
 
 /**
  * GET - Récupère les factures de l'utilisateur

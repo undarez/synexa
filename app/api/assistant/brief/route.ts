@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { startOfDay, endOfDay, addDays, format } from "date-fns";
 import { fr } from "date-fns/locale";
-import type { Routine, Task, CalendarEvent, Reminder } from "@prisma/client";
-import prisma from "@/app/lib/prisma";
-import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
+import type { Routine, Task, CalendarEvent, Reminder } from "@/app/lib/supabase/types";
+import { supabase } from "@/app/lib/supabase/client";
+import { requireUser, UnauthorizedError } from "@/app/lib/auth/mock";
 import { getWeather } from "@/app/lib/services/weather";
 
 interface BriefData {
@@ -59,59 +59,80 @@ export async function GET() {
     const todayEnd = endOfDay(now);
     const tomorrow = addDays(now, 1);
 
-    // Récupérer toutes les données en parallèle
+    // Récupérer toutes les données en parallèle avec Supabase
     const [
-      events,
-      allTasks,
-      reminders,
-      routines,
-      userData,
+      eventsResult,
+      tasksResult,
+      remindersResult,
+      routinesResult,
+      userResult,
     ] = await Promise.all([
       // Événements du jour
-      prisma.calendarEvent.findMany({
-        where: {
-          userId: user.id,
-          start: { gte: todayStart, lt: endOfDay(tomorrow) },
-        },
-        orderBy: { start: "asc" },
-      }),
+      supabase
+        .from('CalendarEvent')
+        .select('*')
+        .eq('userId', user.id)
+        .gte('start', todayStart.toISOString())
+        .lt('start', endOfDay(tomorrow).toISOString())
+        .order('start', { ascending: true }),
       // Toutes les tâches
-      prisma.task.findMany({
-        where: { userId: user.id, completed: false },
-        orderBy: [
-          { priority: "desc" },
-          { due: { sort: "asc", nulls: "last" } },
-        ],
-      }),
+      supabase
+        .from('Task')
+        .select('*')
+        .eq('userId', user.id)
+        .eq('completed', false)
+        .order('priority', { ascending: false })
+        .order('due', { ascending: true, nullsFirst: false }),
       // Rappels à venir (prochaines 24h)
-      prisma.reminder.findMany({
-        where: {
-          userId: user.id,
-          status: "PENDING",
-          scheduledFor: { gte: now, lte: addDays(now, 1) },
-        },
-        include: {
-          calendarEvent: true,
-        },
-        orderBy: { scheduledFor: "asc" },
-        take: 10,
-      }),
+      supabase
+        .from('Reminder')
+        .select(`
+          *,
+          calendarEvent:CalendarEvent(*)
+        `)
+        .eq('userId', user.id)
+        .eq('status', 'PENDING')
+        .gte('scheduledFor', now.toISOString())
+        .lte('scheduledFor', addDays(now, 1).toISOString())
+        .order('scheduledFor', { ascending: true })
+        .limit(10),
       // Routines actives
-      prisma.routine.findMany({
-        where: { userId: user.id, active: true },
-        orderBy: { createdAt: "asc" },
-      }),
+      supabase
+        .from('Routine')
+        .select('*')
+        .eq('userId', user.id)
+        .eq('active', true)
+        .order('createdAt', { ascending: true }),
       // Données utilisateur pour géolocalisation
-      prisma.user.findUnique({
-        where: { id: user.id },
-        select: {
-          homeAddress: true,
-          workAddress: true,
-          workLat: true,
-          workLng: true,
-        },
-      }),
+      supabase
+        .from('User')
+        .select('homeAddress, workAddress, workLat, workLng')
+        .eq('id', user.id)
+        .single(),
     ]);
+
+    // Extraire les données et gérer les erreurs
+    if (eventsResult.error) {
+      console.error('[Brief] Erreur récupération événements:', eventsResult.error);
+    }
+    if (tasksResult.error) {
+      console.error('[Brief] Erreur récupération tâches:', tasksResult.error);
+    }
+    if (remindersResult.error) {
+      console.error('[Brief] Erreur récupération rappels:', remindersResult.error);
+    }
+    if (routinesResult.error) {
+      console.error('[Brief] Erreur récupération routines:', routinesResult.error);
+    }
+    if (userResult.error) {
+      console.error('[Brief] Erreur récupération utilisateur:', userResult.error);
+    }
+
+    const events = (eventsResult.data || []) as CalendarEvent[];
+    const allTasks = (tasksResult.data || []) as Task[];
+    const reminders = (remindersResult.data || []) as Reminder[];
+    const routines = (routinesResult.data || []) as Routine[];
+    const userData = userResult.data as { homeAddress?: string | null; workAddress?: string | null; workLat?: number | null; workLng?: number | null } | null;
 
     // Séparer les tâches
     const highPriorityTasks = allTasks.filter((t: Task) => t.priority === "HIGH");

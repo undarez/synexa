@@ -18,7 +18,7 @@ export function isAdmin(email: string | null | undefined): boolean {
  * Nécessite une session active
  */
 export async function requireAdmin() {
-  const { getCurrentUser } = await import("./session");
+  const { getCurrentUser } = await import("./server");
   const user = await getCurrentUser();
   
   if (!user?.email) {

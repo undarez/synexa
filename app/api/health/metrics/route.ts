@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
+import { requireUser } from "@/app/lib/auth/mock";
 import {
   createHealthMetric,
   getHealthMetrics,
   getHealthMetricsSummary,
 } from "@/app/lib/health/metrics";
-import { HealthMetricType } from "@prisma/client";
+import { HealthMetricType } from "@/app/lib/supabase/types";
 
 /**
  * GET - Récupère les métriques de santé

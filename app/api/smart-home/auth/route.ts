@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
-import prisma from "@/app/lib/prisma";
+import { requireUser } from "@/app/lib/auth/mock";
+import { supabase } from "@/app/lib/supabase/client";
 
 /**
  * POST /api/smart-home/auth
@@ -50,25 +50,33 @@ export async function POST(request: NextRequest) {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
 
+    const now = new Date().toISOString();
+    
     // Sauvegarder les credentials
-    const credentials = await prisma.eWeLinkCredentials.upsert({
-      where: { userId: user.id },
-      update: {
-        accessToken: authData.at,
-        refreshToken: authData.rt,
-        expiresAt,
-        region,
-        appId,
-      },
-      create: {
+    const { data: credentials, error: upsertError } = await supabase
+      .from('EWeLinkCredentials')
+      // @ts-expect-error - Le type Database.Update est any, mais TypeScript ne l'infère pas correctement
+      .upsert({
         userId: user.id,
         accessToken: authData.at,
-        refreshToken: authData.rt,
-        expiresAt,
+        refreshToken: authData.rt || null,
+        expiresAt: expiresAt.toISOString(),
         region,
-        appId,
-      },
-    });
+        appId: appId || null,
+        updatedAt: now,
+      }, {
+        onConflict: 'userId',
+      })
+      .select()
+      .single();
+
+    if (upsertError || !credentials) {
+      console.error('[POST /smart-home/auth] Erreur upsert:', upsertError);
+      return NextResponse.json(
+        { error: 'Erreur lors de la sauvegarde des credentials', details: upsertError?.message },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
@@ -92,15 +100,15 @@ export async function GET(request: NextRequest) {
   try {
     const user = await requireUser();
 
-    const credentials = await prisma.eWeLinkCredentials.findUnique({
-      where: { userId: user.id },
-      select: {
-        id: true,
-        region: true,
-        expiresAt: true,
-        createdAt: true,
-      },
-    });
+    const { data: credentials, error: fetchError } = await supabase
+      .from('EWeLinkCredentials')
+      .select('id, region, expiresAt, createdAt')
+      .eq('userId', user.id)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('[GET /smart-home/auth] Erreur:', fetchError);
+    }
 
     if (!credentials) {
       return NextResponse.json({ configured: false });
@@ -133,9 +141,18 @@ export async function DELETE(request: NextRequest) {
   try {
     const user = await requireUser();
 
-    await prisma.eWeLinkCredentials.delete({
-      where: { userId: user.id },
-    });
+    const { error: deleteError } = await supabase
+      .from('EWeLinkCredentials')
+      .delete()
+      .eq('userId', user.id);
+
+    if (deleteError) {
+      console.error('[DELETE /smart-home/auth] Erreur:', deleteError);
+      return NextResponse.json(
+        { error: 'Erreur lors de la suppression', details: deleteError.message },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,

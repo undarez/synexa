@@ -3,8 +3,7 @@
 import { Bell, Mail, MessageSquare, Calendar, Trash2, Clock, Repeat } from "lucide-react";
 import { Card, CardContent } from "@/app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
-import { ReminderType, ReminderStatus } from "@prisma/client";
-import type { Reminder } from "@prisma/client";
+import { ReminderType, ReminderStatus, type Reminder } from "@/app/lib/supabase/types";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { parseRecurrenceRule } from "@/app/lib/reminders/recurrence";

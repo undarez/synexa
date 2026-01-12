@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
+import { requireUser, UnauthorizedError } from "@/app/lib/auth/mock";
 import { searchNews, searchNewsByCategory, type NewsCategory } from "@/app/lib/services/news";
 import { getPersonalizedNews } from "@/app/lib/services/news-personalization";
 import { logger } from "@/app/lib/logger";

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/app/lib/auth/session";
+import { getCurrentUser } from "@/app/lib/auth/mock";
 import { Navigation } from "@/app/components/Navigation";
 import { Footer } from "@/app/components/Footer";
 import SynexaChat from "@/app/components/SynexaChat";

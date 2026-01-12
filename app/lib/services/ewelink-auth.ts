@@ -1,4 +1,4 @@
-import prisma from "@/app/lib/prisma";
+import { createServerComponentClient } from "@/app/lib/supabase/server-client";
 
 export interface EWeLinkCredentials {
   accessToken: string;
@@ -9,17 +9,21 @@ export interface EWeLinkCredentials {
 }
 
 /**
- * Récupère les credentials eWeLink de l'utilisateur
+ * Récupère les credentials eWeLink de l'utilisateur depuis Supabase
  */
 export async function getEWeLinkCredentials(
   userId: string
 ): Promise<EWeLinkCredentials | null> {
   try {
-    const credentials = await prisma.eWeLinkCredentials.findUnique({
-      where: { userId },
-    });
+    const supabase = await createServerComponentClient();
+    
+    const { data: credentials, error } = await supabase
+      .from("EWeLinkCredentials")
+      .select("*")
+      .eq("userId", userId)
+      .single();
 
-    if (!credentials) {
+    if (error || !credentials) {
       return null;
     }
 
@@ -35,7 +39,7 @@ export async function getEWeLinkCredentials(
     return {
       accessToken: credentials.accessToken,
       refreshToken: credentials.refreshToken,
-      expiresAt: credentials.expiresAt,
+      expiresAt: credentials.expiresAt ? new Date(credentials.expiresAt) : null,
       region: credentials.region,
       appId: credentials.appId,
     };

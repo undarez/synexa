@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
+import { requireUser, UnauthorizedError } from "@/app/lib/auth/mock";
 import Groq from "groq-sdk";
 import { getSynexaSystemPromptWithContext } from "@/app/lib/ai/synexa-system-prompt";
 import { getUserContextForSynexa } from "@/app/lib/ai/conversation";

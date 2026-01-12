@@ -20,8 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/app/components/ui/dialog";
-import { ReminderType } from "@prisma/client";
-import type { CalendarEvent } from "@prisma/client";
+import { ReminderType, type CalendarEvent } from "@/app/lib/supabase/types";
 import { Loader2, Repeat, Sparkles } from "lucide-react";
 
 interface ReminderFormProps {

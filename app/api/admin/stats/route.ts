@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/app/lib/auth/admin";
-import prisma from "@/app/lib/prisma";
+import { supabase } from "@/app/lib/supabase/client";
 
 /**
  * GET - Statistiques globales de l'application (admin uniquement)
@@ -9,27 +9,30 @@ export async function GET() {
   try {
     await requireAdmin();
 
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
     const [
-      totalUsers,
-      activeUsers,
-      totalEnergyData,
-      totalCalendarEvents,
-      totalTasks,
-      securityLogs,
+      totalUsersResult,
+      activeUsersResult,
+      totalEnergyDataResult,
+      totalCalendarEventsResult,
+      totalTasksResult,
+      securityLogsResult,
     ] = await Promise.all([
-      prisma.user.count(),
-      prisma.user.count({
-        where: {
-          updatedAt: {
-            gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Actifs dans les 30 derniers jours
-          },
-        },
-      }),
-      prisma.energyConsumption.count(),
-      prisma.calendarEvent.count(),
-      prisma.task.count(),
-      prisma.securityLog.count(),
+      supabase.from('User').select('id', { count: 'exact', head: true }),
+      supabase.from('User').select('id', { count: 'exact', head: true }).gte('updatedAt', thirtyDaysAgo),
+      supabase.from('EnergyConsumption').select('id', { count: 'exact', head: true }),
+      supabase.from('CalendarEvent').select('id', { count: 'exact', head: true }),
+      supabase.from('Task').select('id', { count: 'exact', head: true }),
+      supabase.from('SecurityLog').select('id', { count: 'exact', head: true }),
     ]);
+
+    const totalUsers = totalUsersResult.count || 0;
+    const activeUsers = activeUsersResult.count || 0;
+    const totalEnergyData = totalEnergyDataResult.count || 0;
+    const totalCalendarEvents = totalCalendarEventsResult.count || 0;
+    const totalTasks = totalTasksResult.count || 0;
+    const securityLogs = securityLogsResult.count || 0;
 
     return NextResponse.json({
       stats: {

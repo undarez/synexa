@@ -19,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/app/components/ui/dialog";
-import type { Income } from "@prisma/client";
+// import type { Income } from "@/app/lib/supabase/types"; // TODO: Ajouter le type Income dans types.ts
 import { format } from "date-fns";
 
 interface IncomeFormProps {

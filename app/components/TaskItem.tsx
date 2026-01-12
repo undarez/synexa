@@ -3,7 +3,7 @@
 import { format } from "date-fns";
 import { Pencil, Trash2, CheckCircle2, Clock, Zap, AlertCircle } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
-import type { Task, TaskPriority, TaskContext, EnergyLevel } from "@prisma/client";
+import type { Task, TaskPriority, TaskContext, EnergyLevel } from "@/app/lib/supabase/types";
 import { Briefcase, ShoppingBag, Heart, Wallet, Home, Users, BookOpen, MoreHorizontal } from "lucide-react";
 
 interface TaskItemProps {

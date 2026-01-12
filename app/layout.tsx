@@ -6,6 +6,7 @@ import { Providers } from "./providers";
 import { PWARegister } from "./components/PWARegister";
 import { LowerThird } from "./components/LowerThird";
 import { BrowserExtensionHandler } from "./components/BrowserExtensionHandler";
+import { SessionSync } from "./components/SessionSync";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -59,6 +60,7 @@ export default function RootLayout({
       >
         <Providers>
           <BrowserExtensionHandler />
+          <SessionSync />
           {children}
           <PWARegister />
           <LowerThird />

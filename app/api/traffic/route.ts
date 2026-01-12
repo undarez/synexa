@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
-import prisma from "@/app/lib/prisma";
+import { requireUser, UnauthorizedError } from "@/app/lib/auth/mock";
+import { supabase } from "@/app/lib/supabase/client";
 import { 
-  getTrafficFromTomTom, 
   getTrafficFromOpenRouteService,
-  getTrafficFromGoogleMaps, 
-  getTrafficFlowFromTomTom,
-  getTrafficIncidentsFromTomTom
+  getTrafficFromGoogleMaps
 } from "@/app/lib/services/traffic";
 import { geocodeAddress } from "@/app/lib/services/tomtom-geocoding";
 
@@ -18,14 +15,16 @@ export async function GET(request: NextRequest) {
     const lng = searchParams.get("lng");
     
     // Récupérer l'adresse travail de l'utilisateur si disponible
-    const userProfile = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: { workAddress: true, workLat: true, workLng: true },
-    });
+    const { data: userProfile } = await supabase
+      .from('User')
+      .select('workAddress, workLat, workLng')
+      .eq('id', user.id)
+      .single();
     
-    const destinationText = userProfile?.workAddress || searchParams.get("destination") || "Travail";
-    let destinationLat = userProfile?.workLat;
-    let destinationLng = userProfile?.workLng;
+    const profile = userProfile as { workAddress?: string; workLat?: number; workLng?: number } | null;
+    const destinationText = profile?.workAddress || searchParams.get("destination") || "Travail";
+    let destinationLat = profile?.workLat;
+    let destinationLng = profile?.workLng;
     let destination = destinationText;
     
     // Si on a une destination textuelle mais pas de coordonnées, géocodifier
@@ -57,25 +56,17 @@ export async function GET(request: NextRequest) {
     }
 
 
-    // Si on a une position utilisateur, essayer TomTom en priorité
+    // Utiliser OpenRouteService (GRATUIT, OPEN-SOURCE, basé sur OpenStreetMap)
     if (userLocation) {
-      // Vérifier si TomTom est configuré
-      const tomtomApiKey = process.env.TOMTOM_API_KEY;
-      
-      console.log("[Traffic API] 🔍 Vérification configuration:", {
+      console.log("[Traffic API] 🔍 Utilisation OpenRouteService (gratuit et open-source):", {
         hasUserLocation: !!userLocation,
         hasDestination: !!(destinationLat && destinationLng),
-        hasTomTomKey: !!tomtomApiKey,
         destinationLat,
         destinationLng,
       });
       
-      if (!tomtomApiKey) {
-        console.warn("[Traffic API] ⚠️ TOMTOM_API_KEY non configurée - mode simulation activé");
-        console.warn("[Traffic API] Ajoutez TOMTOM_API_KEY dans votre .env pour des données en temps réel");
-      } else {
-        // Si on a une destination avec coordonnées, utiliser OpenRouteService (GRATUIT et OPEN-SOURCE)
-        if (destinationLat && destinationLng) {
+      // Si on a une destination avec coordonnées, utiliser OpenRouteService
+      if (destinationLat && destinationLng) {
           console.log("[Traffic API] Tentative d'appel OpenRouteService avec:", {
             origin: `${userLocation.lat},${userLocation.lng}`,
             destination: `${destinationLat},${destinationLng}`,
@@ -93,96 +84,16 @@ export async function GET(request: NextRequest) {
           if (openRouteTraffic) {
             console.log("[Traffic API] ✅ Données OpenRouteService récupérées avec succès");
             
-            // Récupérer les incidents de trafic dans la zone (si TomTom est configuré)
-            const bbox = [
-              Math.min(userLocation.lng, destinationLng) - 0.1,
-              Math.min(userLocation.lat, destinationLat) - 0.1,
-              Math.max(userLocation.lng, destinationLng) + 0.1,
-              Math.max(userLocation.lat, destinationLat) + 0.1,
-            ].join(",");
-            
-            const incidents = await getTrafficIncidentsFromTomTom(bbox);
-            
-            // Récupérer les données de flux de trafic pour la position utilisateur
-            const trafficFlow = await getTrafficFlowFromTomTom(
-              userLocation.lat,
-              userLocation.lng
-            );
-            
-            // Convertir les incidents au format attendu
-            const formattedIncidents = (incidents?.incidents || []).map((incident: any, idx: number) => ({
-              id: `incident-${idx}-${Date.now()}`,
-              type: incident.properties?.iconCategory?.toString() || incident.type || "Incident",
-              severity: incident.properties?.delay && incident.properties.delay > 10 ? "high" as const :
-                       incident.properties?.delay && incident.properties.delay > 5 ? "medium" as const : "low" as const,
-              lat: incident.geometry?.coordinates?.[1] || incident.lat,
-              lng: incident.geometry?.coordinates?.[0] || incident.lng,
-              description: incident.properties?.description || incident.description || "Incident de trafic",
-              delay: incident.properties?.delay ? Math.round(incident.properties.delay / 60) : incident.delay,
-              distance: incident.distance,
-            }));
-
+            // Pas d'incidents simulés - retourner uniquement les routes
             return NextResponse.json({
               ...openRouteTraffic,
-              incidents: formattedIncidents,
-              trafficFlow: trafficFlow ? [trafficFlow] : [],
+              incidents: [], // Pas d'incidents simulés
             });
           }
           
-          // Fallback sur TomTom si OpenRouteService échoue
-          console.log("[Traffic API] OpenRouteService n'a pas fonctionné, essai avec TomTom...");
-          const tomtomTraffic = await getTrafficFromTomTom(
-            userLocation.lat,
-            userLocation.lng,
-            destinationLat,
-            destinationLng,
-            destination
-          );
-
-          if (tomtomTraffic) {
-            console.log("[Traffic API] ✅ Données TomTom récupérées avec succès");
-            
-            // Récupérer les incidents de trafic dans la zone
-            const bbox = [
-              Math.min(userLocation.lng, destinationLng) - 0.1,
-              Math.min(userLocation.lat, destinationLat) - 0.1,
-              Math.max(userLocation.lng, destinationLng) + 0.1,
-              Math.max(userLocation.lat, destinationLat) + 0.1,
-            ].join(",");
-            
-            const incidents = await getTrafficIncidentsFromTomTom(bbox);
-            
-            // Récupérer les données de flux de trafic pour la position utilisateur
-            const trafficFlow = await getTrafficFlowFromTomTom(
-              userLocation.lat,
-              userLocation.lng
-            );
-            
-            // Convertir les incidents au format attendu
-            const formattedIncidentsTomTom = (incidents?.incidents || []).map((incident: any, idx: number) => ({
-              id: `incident-${idx}-${Date.now()}`,
-              type: incident.properties?.iconCategory?.toString() || incident.type || "Incident",
-              severity: incident.properties?.delay && incident.properties.delay > 10 ? "high" as const :
-                       incident.properties?.delay && incident.properties.delay > 5 ? "medium" as const : "low" as const,
-              lat: incident.geometry?.coordinates?.[1] || incident.lat,
-              lng: incident.geometry?.coordinates?.[0] || incident.lng,
-              description: incident.properties?.description || incident.description || "Incident de trafic",
-              delay: incident.properties?.delay ? Math.round(incident.properties.delay / 60) : incident.delay,
-              distance: incident.distance,
-            }));
-
-            return NextResponse.json({
-              ...tomtomTraffic,
-              incidents: formattedIncidentsTomTom,
-              trafficFlow: trafficFlow ? [trafficFlow] : [],
-            });
-          } else {
-            console.log("[Traffic API] ⚠️ TomTom n'a pas retourné de données");
-            console.error("[Traffic API] ❌ TomTom API Key configurée mais aucune donnée retournée");
-            // Continuer avec le fallback
-          }
-
-          // Fallback sur Google Maps si TomTom n'est pas disponible
+          // Fallback sur Google Maps si OpenRouteService échoue
+          console.log("[Traffic API] OpenRouteService n'a pas fonctionné, essai avec Google Maps...");
+          
           const googleTraffic = await getTrafficFromGoogleMaps(
             userLocation.lat,
             userLocation.lng,
@@ -192,42 +103,26 @@ export async function GET(request: NextRequest) {
           );
 
           if (googleTraffic) {
+            // Pas d'incidents simulés - retourner uniquement les routes
             return NextResponse.json({
               ...googleTraffic,
+              incidents: [], // Pas d'incidents simulés
             });
           }
         } else {
-          // Pas de destination mais TomTom est configuré - récupérer au moins les incidents et le flux
-          console.log("[Traffic API] Pas de destination, récupération des incidents et flux de trafic autour de la position");
-          
-          const bbox = [
-            userLocation.lng - 0.1,
-            userLocation.lat - 0.1,
-            userLocation.lng + 0.1,
-            userLocation.lat + 0.1,
-          ].join(",");
-          
-          const incidents = await getTrafficIncidentsFromTomTom(bbox);
-          const trafficFlow = await getTrafficFlowFromTomTom(
-            userLocation.lat,
-            userLocation.lng
-          );
-          
-          // Retourner les données disponibles même sans itinéraire
+          // Pas de destination - retourner un message
           return NextResponse.json({
             origin: "Position actuelle",
             destination: "Aucune destination",
             userLocation,
             destinationLocation: null,
             routes: [],
+            incidents: [], // Pas d'incidents simulés
             lastUpdate: new Date().toISOString(),
-            source: "tomtom",
-            incidents: incidents?.incidents || [],
-            trafficFlow: trafficFlow ? [trafficFlow] : [],
+            source: "openrouteservice",
             message: "Saisissez une destination pour voir les itinéraires",
           });
         }
-      }
     }
 
     // Fallback : simulation si Google Maps n'est pas disponible ou si pas de coordonnées

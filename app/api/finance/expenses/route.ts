@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
+import { requireUser } from "@/app/lib/auth/mock";
 import {
   createExpense,
   getExpenses,
   getMonthlyExpenses,
   getExpensesByCategory,
 } from "@/app/lib/finance/expenses";
-import { ExpenseCategory, ExpenseFrequency } from "@prisma/client";
+import { ExpenseCategory, ExpenseFrequency } from "@/app/lib/supabase/types";
 
 /**
  * GET - Récupère les dépenses de l'utilisateur

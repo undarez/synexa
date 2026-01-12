@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
+import { requireUser, UnauthorizedError } from "@/app/lib/auth/mock";
 import { executeRoutine } from "@/app/lib/routines/engine";
 import { trackActivity } from "@/app/lib/learning/tracker";
 

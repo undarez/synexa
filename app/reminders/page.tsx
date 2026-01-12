@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/app/lib/auth/mock-client";
 import { redirect, useRouter, useSearchParams } from "next/navigation";
 import { Plus, Loader2, Bell } from "lucide-react";
 import { Navigation } from "@/app/components/Navigation";
@@ -17,8 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/app/components/ui/select";
-import { ReminderStatus } from "@prisma/client";
-import type { Reminder } from "@prisma/client";
+import { ReminderStatus, type Reminder } from "@/app/lib/supabase/types";
 import { Footer } from "@/app/components/Footer";
 
 function RemindersContent() {

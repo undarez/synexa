@@ -1,6 +1,6 @@
 import Groq from "groq-sdk";
-import { RoutineTriggerType, RoutineActionType } from "@prisma/client";
-import prisma from "@/app/lib/prisma";
+import { RoutineTriggerType, RoutineActionType } from "@/app/lib/supabase/types";
+import { supabase } from "@/app/lib/supabase/client";
 
 // Initialiser Groq (gratuit)
 const groq = process.env.GROQ_API_KEY
@@ -42,23 +42,33 @@ export async function parseNaturalLanguageRoutine(
   }
 
   // Récupérer les devices de l'utilisateur pour le matching
-  const userDevices = await prisma.device.findMany({
-    where: { userId },
-    select: { id: true, name: true, type: true },
-  });
+  const { data: userDevices, error: devicesError } = await supabase
+    .from("Device")
+    .select("id, name, type")
+    .eq("userId", userId);
+
+  if (devicesError) {
+    console.error("[Routine Parser] Erreur récupération devices:", devicesError);
+  }
+
+  const devices = (userDevices || []).map((d: any) => ({
+    id: d.id,
+    name: d.name,
+    type: d.type,
+  }));
 
   // Si Groq est disponible, utiliser l'IA
   if (groq) {
     try {
-      return await parseWithAI(cleanedText, userId, userDevices);
+      return await parseWithAI(cleanedText, userId, devices);
     } catch (error) {
       console.error("[Routine Parser] Erreur Groq, fallback sur regex:", error);
-      return parseWithRegex(cleanedText, userId, userDevices);
+      return parseWithRegex(cleanedText, userId, devices);
     }
   }
 
   // Sinon, utiliser le parser regex
-  return parseWithRegex(cleanedText, userId, userDevices);
+  return parseWithRegex(cleanedText, userId, devices);
 }
 
 /**

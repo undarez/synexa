@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
+import { requireUser } from "@/app/lib/auth/mock";
 import { generateProactiveSuggestions } from "@/app/lib/ai/proactive-suggestions";
 import { logger } from "@/app/lib/logger";
 

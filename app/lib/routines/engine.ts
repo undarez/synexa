@@ -1,12 +1,9 @@
-import type {
-  Routine,
-  RoutineLog,
-  RoutineStep,
-  RoutineActionType,
-} from "@prisma/client";
-import prisma from "@/app/lib/prisma";
+import { RoutineActionType, RoutineTriggerType } from "@/app/lib/supabase/types";
+import type { Routine, RoutineLog, RoutineStep } from "@/app/lib/supabase/types";
+import { supabase } from "@/app/lib/supabase/client";
 import { dispatchDeviceCommand } from "@/app/lib/routines/transport";
-import { toJsonInput } from "@/app/lib/prisma/json";
+import { toJsonInput } from "@/app/lib/supabase/helpers";
+import { generateId } from "@/app/lib/supabase/helpers";
 
 export type RoutineExecutionOptions = {
   dryRun?: boolean;
@@ -107,15 +104,11 @@ async function executeStep(
             let destinationLng: number | null = null;
             
             if (userId) {
-              const userProfile = await prisma.user.findUnique({
-                where: { id: userId },
-                select: {
-                  workAddress: true,
-                  workLat: true,
-                  workLng: true,
-                  homeAddress: true,
-                },
-              });
+              const { data: userProfile } = await supabase
+                .from('User')
+                .select('workAddress, workLat, workLng, homeAddress')
+                .eq('id', userId)
+                .single();
 
               // Utiliser la destination du payload si fournie, sinon utiliser travail
               const customDest = (payload.destination as string) || "";
@@ -285,10 +278,11 @@ async function executeStep(
         ) {
           // Récupérer l'adresse travail de l'utilisateur
           if (userId) {
-            const userProfile = await prisma.user.findUnique({
-              where: { id: userId },
-              select: { workLat: true, workLng: true, workAddress: true },
-            });
+            const { data: userProfile } = await supabase
+              .from('User')
+              .select('workLat, workLng, workAddress')
+              .eq('id', userId)
+              .single();
 
             if (userProfile?.workLat && userProfile.workLng) {
               notificationData = {
@@ -327,7 +321,7 @@ async function executeStep(
         }
 
         try {
-          // Créer la tâche directement via Prisma
+          // Créer la tâche directement via Supabase
           if (!userId) {
             return {
               stepId: step.id,
@@ -338,12 +332,28 @@ async function executeStep(
             };
           }
 
-          const task = await prisma.task.create({
-            data: {
+          // Créer la tâche directement avec Supabase
+          const taskId = generateId();
+          const now = new Date().toISOString();
+          
+          const { data: task, error: taskError } = await supabase
+            .from('Task')
+            .insert({
+              id: taskId,
               userId,
               title,
-            },
-          });
+              priority: "MEDIUM",
+              context: "PERSONAL",
+              completed: false,
+              createdAt: now,
+              updatedAt: now,
+            })
+            .select()
+            .single();
+
+          if (taskError || !task) {
+            throw new Error(taskError?.message || "Erreur lors de la création de la tâche");
+          }
 
           return {
             stepId: step.id,
@@ -392,7 +402,7 @@ async function executeStep(
   }
 }
 
-function computeStatus(results: RoutineStepResult[]): RoutineLog["status"] {
+function computeStatus(results: RoutineStepResult[]): string {
   if (results.every((step) => step.status === "success")) return "success";
   if (results.some((step) => step.status === "failed")) {
     return results.some((step) => step.status === "success")
@@ -407,33 +417,69 @@ export async function executeRoutine(
   userId: string,
   options: RoutineExecutionOptions = {}
 ): Promise<RoutineExecutionResult> {
-  const routine = await prisma.routine.findFirst({
-    where: { id: routineId, userId },
-    include: { steps: { orderBy: { order: "asc" } } },
-  });
+  // Récupérer la routine avec ses steps depuis Supabase
+  const { data: routine, error: routineError } = await supabase
+    .from('Routine')
+    .select(`
+      *,
+      steps:RoutineStep(*)
+    `)
+    .eq('id', routineId)
+    .eq('userId', userId)
+    .single();
+
+  if (routineError) {
+    console.error('[executeRoutine] Erreur Supabase:', routineError);
+    throw new Error(`Routine introuvable: ${routineError.message}`);
+  }
 
   if (!routine) {
+    console.error('[executeRoutine] Routine non trouvée:', { routineId, userId });
     throw new Error("Routine introuvable");
   }
 
+  // Trier les steps par ordre
+  const sortedSteps = (routine.steps || []).sort((a: RoutineStep, b: RoutineStep) => (a.order || 0) - (b.order || 0));
+
   const results: RoutineStepResult[] = [];
-  for (const step of routine.steps) {
+  for (const step of sortedSteps) {
     const result = await executeStep(step, options, userId);
     results.push(result);
     // TODO: gérer delaySeconds via job queue (BullMQ, Cloud Tasks, etc.)
   }
 
-  const log = await prisma.routineLog.create({
-    data: {
-      routineId: routine.id,
-      status: computeStatus(results),
-      details:
-        toJsonInput({
-          results,
-          metadata: options.metadata ?? null,
-        }) ?? undefined,
-    },
+  // Créer le log d'exécution
+  const logId = generateId();
+  const logStatus = computeStatus(results);
+  const logDetails = toJsonInput({
+    results,
+    metadata: options.metadata ?? null,
   });
 
-  return { routine, log, results };
+  const { data: log, error: logError } = await supabase
+    .from('RoutineLog')
+    .insert({
+      id: logId,
+      routineId: routine.id,
+      status: logStatus,
+      details: logDetails as Record<string, unknown> | null,
+      executedAt: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (logError || !log) {
+    console.error('[executeRoutine] Erreur création log:', logError);
+    // Créer un log minimal en cas d'erreur
+    const minimalLog: RoutineLog = {
+      id: logId,
+      routineId: routine.id,
+      executedAt: new Date(),
+      status: logStatus,
+      details: logDetails as Record<string, unknown> | null,
+    };
+    return { routine: routine as Routine, log: minimalLog, results };
+  }
+
+  return { routine: routine as Routine, log: log as RoutineLog, results };
 }

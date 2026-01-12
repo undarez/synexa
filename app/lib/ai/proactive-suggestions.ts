@@ -3,11 +3,15 @@
  * Génère des suggestions contextuelles basées sur les patterns, l'heure, et les données utilisateur
  */
 
-import prisma from "@/app/lib/prisma";
+// TODO: Remplacer par Supabase
+// import { supabase } from "@/app/lib/supabase/client";
+import prisma from "@/app/lib/prisma"; // Stub temporaire
 import { analyzeRecentPatterns } from "@/app/lib/learning/tracker";
 import { detectPatterns } from "@/app/lib/learning/patterns";
 import { getPersonalizedRecommendations } from "@/app/lib/learning/recommendations";
-import type { Task, RoutineLog } from "@prisma/client";
+// TODO: Remplacer les types Prisma par les types Supabase
+// import type { Task, RoutineLog } from "@/app/lib/supabase/types";
+import type { Task, RoutineLog } from "@/app/lib/prisma-types";
 
 export interface ProactiveSuggestion {
   id: string;

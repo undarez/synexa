@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
-import prisma from "@/app/lib/prisma";
+import { requireUser } from "@/app/lib/auth/mock";
+import { supabase } from "@/app/lib/supabase/client";
 import { calculateConsumptionStats } from "@/app/lib/services/enedis-api";
 import { logger } from "@/app/lib/logger";
-import type { EnergyConsumption } from "@prisma/client";
 
 /**
  * GET /api/energy/overview
@@ -26,36 +25,48 @@ export async function GET(request: NextRequest) {
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
     // Récupérer les données du mois actuel
-    const currentMonthData = await prisma.energyConsumption.findMany({
-      where: {
-        userId: user.id,
-        date: {
-          gte: startOfMonth,
-          lte: endOfMonth,
-        },
-      },
-      orderBy: { date: "asc" },
-    });
+    const { data: currentMonthData, error: currentMonthError } = await supabase
+      .from('EnergyConsumption')
+      .select('*')
+      .eq('userId', user.id)
+      .gte('date', startOfMonth.toISOString())
+      .lte('date', endOfMonth.toISOString())
+      .order('date', { ascending: true });
+
+    if (currentMonthError) {
+      logger.error("Erreur récupération données mois actuel", currentMonthError);
+    }
 
     // Récupérer les données du mois précédent pour la comparaison
     const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const previousMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
     
-    const previousMonthData = await prisma.energyConsumption.findMany({
-      where: {
-        userId: user.id,
-        date: {
-          gte: previousMonthStart,
-          lte: previousMonthEnd,
-        },
-      },
-    });
+    const { data: previousMonthData, error: previousMonthError } = await supabase
+      .from('EnergyConsumption')
+      .select('*')
+      .eq('userId', user.id)
+      .gte('date', previousMonthStart.toISOString())
+      .lte('date', previousMonthEnd.toISOString());
+
+    if (previousMonthError) {
+      logger.error("Erreur récupération données mois précédent", previousMonthError);
+    }
 
     // Calculer les totaux
-    const currentMonthTotal = currentMonthData.reduce((sum: number, d: EnergyConsumption) => sum + d.value, 0);
-    const currentMonthCost = currentMonthData.reduce((sum: number, d: EnergyConsumption) => sum + (d.cost || 0), 0);
+    type ConsumptionData = { value: number; cost: number; date: string; [key: string]: unknown };
+    const currentMonthTotal = (currentMonthData || []).reduce((sum: number, d: unknown) => {
+      const typedD = d as ConsumptionData;
+      return sum + (typedD.value || 0);
+    }, 0);
+    const currentMonthCost = (currentMonthData || []).reduce((sum: number, d: unknown) => {
+      const typedD = d as ConsumptionData;
+      return sum + (typedD.cost || 0);
+    }, 0);
     
-    const previousMonthTotal = previousMonthData.reduce((sum: number, d: EnergyConsumption) => sum + d.value, 0);
+    const previousMonthTotal = (previousMonthData || []).reduce((sum: number, d: unknown) => {
+      const typedD = d as ConsumptionData;
+      return sum + (typedD.value || 0);
+    }, 0);
     
     // Calculer la tendance
     const trend = previousMonthTotal > 0
@@ -64,29 +75,33 @@ export async function GET(request: NextRequest) {
 
     // Formater l'historique (30 derniers jours)
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const historyData = await prisma.energyConsumption.findMany({
-      where: {
-        userId: user.id,
-        date: {
-          gte: thirtyDaysAgo,
-          lte: now,
-        },
-      },
-      orderBy: { date: "asc" },
-    });
+    const { data: historyData, error: historyError } = await supabase
+      .from('EnergyConsumption')
+      .select('*')
+      .eq('userId', user.id)
+      .gte('date', thirtyDaysAgo.toISOString())
+      .lte('date', now.toISOString())
+      .order('date', { ascending: true });
 
-    const history = historyData.map((d: EnergyConsumption) => ({
-      date: d.date.toISOString().split("T")[0],
-      value: d.value,
-    }));
+    if (historyError) {
+      logger.error("Erreur récupération historique", historyError);
+    }
+
+    const history = (historyData || []).map((d: unknown) => {
+      const typedD = d as ConsumptionData;
+      return {
+        date: new Date(typedD.date).toISOString().split("T")[0],
+        value: typedD.value || 0,
+      };
+    });
 
     // Générer les alertes
     const alerts: string[] = [];
     
     // Alerte si consommation supérieure à la moyenne
-    if (currentMonthData.length > 0) {
+    if (currentMonthData && currentMonthData.length > 0) {
       const average = currentMonthTotal / currentMonthData.length;
-      const todayData = currentMonthData[currentMonthData.length - 1];
+      const todayData = currentMonthData[currentMonthData.length - 1] as ConsumptionData | undefined;
       if (todayData && todayData.value > average * 1.2) {
         alerts.push("Consommation supérieure à la moyenne");
       }

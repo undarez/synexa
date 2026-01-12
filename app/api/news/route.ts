@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
+import { requireUser, UnauthorizedError } from "@/app/lib/auth/mock";
 
 // Simulation d'API actualités - À remplacer par une vraie API (NewsAPI, RSS, etc.)
 export async function GET(request: NextRequest) {

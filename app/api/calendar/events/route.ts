@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Prisma } from "@prisma/client";
-import { CalendarSource } from "@prisma/client";
-import prisma from "@/app/lib/prisma";
-import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
-import { toJsonInput } from "@/app/lib/prisma/json";
+import { CalendarSource } from "@/app/lib/supabase/types";
+import { supabase } from "@/app/lib/supabase/client";
+import { requireUser, UnauthorizedError } from "@/app/lib/auth/mock";
 import { trackActivity } from "@/app/lib/learning/tracker";
+import { generateId } from "@/app/lib/supabase/helpers";
 import {
   createGoogleCalendarEvent,
   convertInternalEventToGoogle,
@@ -59,40 +58,51 @@ function mapSourceFilter(values: string[]): CalendarSource[] {
     .filter((value): value is CalendarSource => allowed.has(value as CalendarSource));
 }
 
-function buildWhere(
+// Fonction helper pour construire la requête Supabase avec filtres
+function buildSupabaseQuery(
   userId: string,
   params: URLSearchParams
-): Prisma.CalendarEventWhereInput {
+) {
   const from = parseDateParam(params.get("from"));
   const to = parseDateParam(params.get("to"));
   const sources = mapSourceFilter(params.getAll("source"));
 
-  const where: Prisma.CalendarEventWhereInput = { userId };
+  let query = supabase
+    .from('CalendarEvent')
+    .select('*')
+    .eq('userId', userId);
 
-  if (from || to) {
-    where.start = {
-      gte: from,
-      lte: to,
-    };
+  if (from) {
+    query = query.gte('start', from.toISOString());
+  }
+
+  if (to) {
+    query = query.lte('start', to.toISOString());
   }
 
   if (sources.length > 0) {
-    where.source = { in: sources };
+    query = query.in('source', sources);
   }
 
-  return where;
+  return query;
 }
 
 export async function GET(request: NextRequest) {
   try {
     const user = await requireUser();
-    const where = buildWhere(user.id, request.nextUrl.searchParams);
+    const query = buildSupabaseQuery(user.id, request.nextUrl.searchParams);
 
-    const events = await prisma.calendarEvent.findMany({
-      where,
-      orderBy: { start: "asc" },
-    });
-    return NextResponse.json({ events });
+    const { data: events, error } = await query.order('start', { ascending: true });
+
+    if (error) {
+      console.error('[GET /calendar/events] Erreur Supabase:', error);
+      return NextResponse.json(
+        { error: 'Erreur lors de la récupération des événements', details: error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ events: events || [] });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: error.message }, { status: 401 });
@@ -156,22 +166,41 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const event = await prisma.calendarEvent.create({
-      data: {
+    const now = new Date().toISOString();
+    const eventId = generateId();
+    
+    type CreatedEvent = { id: string; [key: string]: unknown };
+    const { data: event, error: createError } = await supabase
+      .from('CalendarEvent')
+      .insert({
+        id: eventId,
         userId: user.id,
         title: body.title,
-        description: body.description,
-        location: body.location,
-        start,
-        end,
+        description: body.description || null,
+        location: body.location || null,
+        start: start.toISOString(),
+        end: end.toISOString(),
         allDay: body.allDay ?? false,
         source: finalSource,
         externalId,
         calendarId: body.calendarId ?? null,
-        reminders: toJsonInput(body.reminders),
-        metadata: toJsonInput(body.metadata),
-      },
-    });
+        reminders: body.reminders ?? null,
+        metadata: body.metadata ?? null,
+        createdAt: now,
+        updatedAt: now,
+      } as any)
+      .select()
+      .single();
+
+    if (createError || !event) {
+      console.error('[POST /calendar/events] Erreur Supabase:', createError);
+      return NextResponse.json(
+        { error: 'Erreur lors de la création de l\'événement', details: createError?.message },
+        { status: 500 }
+      );
+    }
+
+    const typedEvent = event as CreatedEvent;
 
     // Tracker l'activité
     await trackActivity(
@@ -183,7 +212,7 @@ export async function POST(request: NextRequest) {
         source: finalSource,
       },
       "CalendarEvent",
-      event.id
+      typedEvent.id
     );
 
     return NextResponse.json({ event }, { status: 201 });

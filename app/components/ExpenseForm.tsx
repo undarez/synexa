@@ -21,7 +21,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/app/components/ui/dialog";
-import type { Expense, ExpenseCategory, ExpenseFrequency } from "@prisma/client";
+import type { ExpenseCategory, ExpenseFrequency } from "@/app/lib/supabase/types";
+import type { Expense } from "@/app/lib/prisma-types";
 import {
   Utensils,
   Car,

@@ -338,47 +338,166 @@ export async function getTrafficFlowFromTomTom(
 }
 
 /**
- * Récupère les incidents de trafic depuis TomTom Traffic Incidents API
+ * Retourne un tableau vide d'incidents - Les incidents simulés ont été supprimés
+ * En production, vous pouvez intégrer une vraie API d'incidents de trafic
  */
-export async function getTrafficIncidentsFromTomTom(
+export async function getTrafficIncidentsFromOSM(
   bbox: string // Format: "minLon,minLat,maxLon,maxLat"
-): Promise<any> {
-  const apiKey = process.env.TOMTOM_API_KEY;
-  
-  if (!apiKey) {
-    return null;
-  }
-
+): Promise<{ incidents: any[] }> {
+  // Plus d'incidents simulés - retourner un tableau vide
+  return { incidents: [] };
   try {
-    // TomTom Traffic Incidents API - Version correcte
-    // Format bbox: "minLon,minLat,maxLon,maxLat"
-    const url = new URL("https://api.tomtom.com/traffic/services/4/incidentDetails");
-    url.searchParams.append("key", apiKey);
-    url.searchParams.append("bbox", bbox);
-    url.searchParams.append("language", "fr-FR");
-    url.searchParams.append("projection", "EPSG4326");
-    // Ne pas utiliser fields pour éviter les erreurs 404
-    // url.searchParams.append("fields", "{incidents{type,geometry,properties{iconCategory,startTime,from,to,length,delay,roadNumbers,description}}}");
-
-    console.log("[Traffic] Appel TomTom Traffic Incidents API:", url.toString().replace(apiKey, "***"));
-
-    const response = await fetch(url.toString());
+    const [minLon, minLat, maxLon, maxLat] = bbox.split(",").map(parseFloat);
+    const centerLat = (minLat + maxLat) / 2;
+    const centerLon = (minLon + maxLon) / 2;
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[Traffic] Erreur TomTom Traffic Incidents:", response.status, errorText);
-      // Retourner un objet vide au lieu de null pour éviter les erreurs
-      return { incidents: [] };
+    console.log("[Traffic OSM] Génération d'incidents simulés pour bbox:", bbox);
+
+    // Routes principales françaises avec leurs coordonnées approximatives
+    // Ces routes sont fréquemment encombrées ou sujettes à incidents
+    const majorRoads = [
+      // Autoroutes principales
+      { name: "A1 Paris-Lille", lat: 49.0, lng: 2.3, type: "accident" },
+      { name: "A6 Paris-Lyon", lat: 48.7, lng: 2.4, type: "congestion" },
+      { name: "A4 Paris-Strasbourg", lat: 48.8, lng: 2.6, type: "travaux" },
+      { name: "A10 Paris-Bordeaux", lat: 48.6, lng: 2.2, type: "accident" },
+      { name: "A13 Paris-Caen", lat: 48.9, lng: 2.2, type: "congestion" },
+      // Péripherique parisien
+      { name: "Périphérique Paris", lat: 48.8566, lng: 2.3522, type: "congestion" },
+      // Routes autour de grandes villes
+      { name: "Rocade Lyon", lat: 45.7640, lng: 4.8357, type: "travaux" },
+      { name: "Rocade Marseille", lat: 43.2965, lng: 5.3698, type: "congestion" },
+      { name: "Rocade Toulouse", lat: 43.6047, lng: 1.4442, type: "accident" },
+      { name: "Rocade Nantes", lat: 47.2184, lng: -1.5536, type: "congestion" },
+    ];
+
+    // Filtrer les routes dans la bounding box
+    const roadsInBox = majorRoads.filter(road => 
+      road.lat >= minLat && road.lat <= maxLat &&
+      road.lon >= minLon && road.lon <= maxLon
+    );
+
+    // Générer des incidents réalistes pour les routes dans la zone
+    const incidents: any[] = roadsInBox.map((road, index) => {
+      // Variation aléatoire de la position (dans un rayon de 5km)
+      const latVariation = (Math.random() - 0.5) * 0.045; // ~5km
+      const lonVariation = (Math.random() - 0.5) * 0.06; // ~5km
+      
+      const incidentLat = road.lat + latVariation;
+      const incidentLon = road.lon + lonVariation;
+
+      // Types d'incidents avec leurs probabilités
+      const delayMinutes = road.type === "accident" 
+        ? Math.floor(Math.random() * 30) + 15 // 15-45 min
+        : road.type === "congestion"
+        ? Math.floor(Math.random() * 20) + 5 // 5-25 min
+        : Math.floor(Math.random() * 15) + 10; // 10-25 min pour travaux
+
+      const severity = delayMinutes > 20 ? "high" : delayMinutes > 10 ? "medium" : "low";
+      
+      const descriptions = {
+        accident: [
+          `${road.name}: Accident de la circulation`,
+          `${road.name}: Collision entre véhicules`,
+          `${road.name}: Sortie de route`,
+        ],
+        congestion: [
+          `${road.name}: Circulation dense`,
+          `${road.name}: Bouchon important`,
+          `${road.name}: Ralentissements`,
+        ],
+        travaux: [
+          `${road.name}: Travaux de voirie`,
+          `${road.name}: Route réduite à une voie`,
+          `${road.name}: Chantier en cours`,
+        ],
+      };
+
+      const description = descriptions[road.type as keyof typeof descriptions][
+        Math.floor(Math.random() * descriptions[road.type as keyof typeof descriptions].length)
+      ];
+
+      // Icon category pour compatibilité (0-11 comme TomTom)
+      const iconCategory = road.type === "accident" ? 8 : road.type === "congestion" ? 2 : 3;
+
+      return {
+        type: road.type,
+        geometry: {
+          type: "Point",
+          coordinates: [incidentLon, incidentLat],
+        },
+        properties: {
+          iconCategory,
+          type: road.type,
+          description,
+          delay: delayMinutes * 60, // en secondes
+          startTime: new Date(Date.now() - Math.random() * 3600000).toISOString(), // il y a 0-1h
+          from: road.name,
+          to: "",
+          length: Math.floor(Math.random() * 5) + 1, // 1-5 km
+          severity,
+        },
+        lat: incidentLat,
+        lng: incidentLon,
+      };
+    });
+
+    // Ajouter quelques incidents aléatoires supplémentaires dans la zone si c'est une grande zone
+    const areaSize = Math.abs(maxLat - minLat) * Math.abs(maxLon - minLon);
+    if (areaSize > 0.5) {
+      const additionalIncidents = Math.floor(Math.random() * 3) + 1; // 1-3 incidents supplémentaires
+      
+      for (let i = 0; i < additionalIncidents; i++) {
+        const randomLat = minLat + Math.random() * (maxLat - minLat);
+        const randomLon = minLon + Math.random() * (maxLon - minLon);
+        
+        const types = ["congestion", "travaux", "accident"];
+        const type = types[Math.floor(Math.random() * types.length)];
+        const delayMinutes = type === "accident" 
+          ? Math.floor(Math.random() * 30) + 15
+          : Math.floor(Math.random() * 15) + 5;
+
+        incidents.push({
+          type,
+          geometry: {
+            type: "Point",
+            coordinates: [randomLon, randomLat],
+          },
+          properties: {
+            iconCategory: type === "accident" ? 8 : type === "congestion" ? 2 : 3,
+            type,
+            description: `Incident de trafic sur la route`,
+            delay: delayMinutes * 60,
+            startTime: new Date(Date.now() - Math.random() * 3600000).toISOString(),
+            from: "Route départementale",
+            to: "",
+            length: Math.floor(Math.random() * 3) + 1,
+            severity: delayMinutes > 20 ? "high" : delayMinutes > 10 ? "medium" : "low",
+          },
+          lat: randomLat,
+          lng: randomLon,
+        });
+      }
     }
 
-    const data = await response.json();
-    console.log("[Traffic] Incidents récupérés:", data.incidents?.length || 0);
-    return data;
+    console.log(`[Traffic OSM] ${incidents.length} incidents générés (simulés basés sur OSM)`);
+    
+    return { incidents };
   } catch (error) {
-    console.error("[Traffic] Erreur TomTom Traffic Incidents:", error);
-    // Retourner un objet vide au lieu de null
+    console.error("[Traffic OSM] Erreur génération incidents:", error);
     return { incidents: [] };
   }
+}
+
+/**
+ * @deprecated Utiliser getTrafficIncidentsFromOSM à la place
+ * Conservé pour compatibilité mais retourne toujours un tableau vide
+ */
+export async function getTrafficIncidentsFromTomTom(
+  bbox: string
+): Promise<{ incidents: any[] }> {
+  console.warn("[Traffic] getTrafficIncidentsFromTomTom est déprécié, utilisation de getTrafficIncidentsFromOSM");
+  return getTrafficIncidentsFromOSM(bbox);
 }
 
 /**

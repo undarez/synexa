@@ -19,7 +19,8 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import Link from "next/link";
-import type { CalendarEvent, Task, Reminder, Routine } from "@prisma/client";
+import type { CalendarEvent, Task, Reminder } from "@/app/lib/supabase/types";
+import type { Routine } from "@/app/lib/prisma-types";
 
 interface BriefData {
   date: string;

@@ -10,6 +10,47 @@ import { useEffect } from "react";
  */
 export function BrowserExtensionHandler() {
   useEffect(() => {
+    // Nettoyer les attributs ajoutés par les extensions de navigateur qui causent des erreurs d'hydratation
+    const attributesToRemove = [
+      'bis_skin_checked',
+      'data-new-gr-c-s-check-loaded',
+      'data-gr-ext-installed',
+      'cz-shortcut-listen',
+    ];
+
+    const cleanAttributes = () => {
+      const allElements = document.querySelectorAll('*');
+      allElements.forEach((element) => {
+        attributesToRemove.forEach((attr) => {
+          if (element.hasAttribute(attr)) {
+            element.removeAttribute(attr);
+          }
+        });
+      });
+    };
+
+    // Nettoyer immédiatement (avant l'hydratation si possible)
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', cleanAttributes);
+    } else {
+      cleanAttributes();
+    }
+    
+    // Nettoyer aussi après un court délai pour capturer les éléments ajoutés par les extensions
+    setTimeout(cleanAttributes, 0);
+
+    // Observer les changements futurs du DOM pour nettoyer automatiquement
+    const observer = new MutationObserver(() => {
+      cleanAttributes();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: attributesToRemove,
+    });
+
     // Intercepter les erreurs liées aux extensions de navigateur
     const originalError = window.console.error;
     const originalWarn = window.console.warn;
@@ -32,6 +73,7 @@ export function BrowserExtensionHandler() {
       "Web Bluetooth API",
       "SecurityError",
       "NotFoundError",
+      "bis_skin_checked", // Attribut ajouté par des extensions de thème
     ];
 
     window.console.error = (...args: any[]) => {
@@ -76,6 +118,7 @@ export function BrowserExtensionHandler() {
 
     // Nettoyer lors du démontage
     return () => {
+      observer.disconnect();
       window.console.error = originalError;
       window.console.warn = originalWarn;
       window.removeEventListener("error", handleUnhandledError);

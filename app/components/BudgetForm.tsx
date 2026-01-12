@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/app/components/ui/dialog";
-import type { Budget, ExpenseCategory } from "@prisma/client";
+import type { ExpenseCategory } from "@/app/lib/supabase/types";
 import {
   Utensils,
   Car,

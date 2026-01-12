@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { DeviceType } from "@prisma/client";
-import prisma from "@/app/lib/prisma";
-import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
-import { toJsonInput } from "@/app/lib/prisma/json";
+import { DeviceType } from "@/app/lib/supabase/types";
+import { supabase } from "@/app/lib/supabase/client";
+import { requireUser, UnauthorizedError } from "@/app/lib/auth/mock";
 
 type DevicePayload = {
   name?: string;
@@ -17,11 +16,21 @@ type DevicePayload = {
 export async function GET() {
   try {
     const user = await requireUser();
-    const devices = await prisma.device.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-    });
-    return NextResponse.json({ devices });
+    const { data: devices, error } = await supabase
+      .from('Device')
+      .select('*')
+      .eq('userId', user.id)
+      .order('createdAt', { ascending: false });
+
+    if (error) {
+      console.error('[GET /devices] Erreur Supabase:', error);
+      return NextResponse.json(
+        { error: 'Erreur lors de la récupération des appareils', details: error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ devices: devices || [] });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: error.message }, { status: 401 });
@@ -46,18 +55,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const device = await prisma.device.create({
-      data: {
+    const now = new Date().toISOString();
+    // @ts-ignore - Supabase infère 'never' mais les données sont valides
+    const { data: device, error } = await supabase
+      .from('Device')
+      .insert({
         userId: user.id,
         name: body.name,
         room: body.room ?? null,
         provider: body.provider,
         externalId: body.externalId,
         type: body.type ?? DeviceType.OTHER,
-        capabilities: toJsonInput(body.capabilities),
-        metadata: toJsonInput(body.metadata),
-      },
-    });
+        capabilities: body.capabilities ?? null,
+        metadata: body.metadata ?? null,
+        createdAt: now,
+        updatedAt: now,
+      } as any)
+      .select()
+      .single();
+
+    if (error || !device) {
+      console.error('[POST /devices] Erreur Supabase:', error);
+      return NextResponse.json(
+        { error: 'Erreur lors de la création de l\'appareil', details: error?.message },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ device }, { status: 201 });
   } catch (error) {

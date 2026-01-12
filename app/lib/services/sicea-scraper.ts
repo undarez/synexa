@@ -319,7 +319,7 @@ export async function scrapeSiceaConsumption(
     // Extraire les données de consommation avec Playwright
     // Playwright evaluate ne peut recevoir qu'un seul argument, donc on passe un objet
     const consumptionData = await page.evaluate(({ start, end }: { start: string; end: string }) => {
-      const data: SiceaConsumptionData[] = [];
+      const data: Array<{ date: string; consumption: number; costText?: string }> = [];
       const startDate = new Date(start);
       const endDate = new Date(end);
 
@@ -363,27 +363,12 @@ export async function scrapeSiceaConsumption(
               }
 
               const consumption = parseFloat(consumptionText.replace(/[^\d.,]/g, "").replace(",", "."));
-              // Calculer le coût avec les tarifs réglementés français
-              // Si un coût est fourni par SICEA, on le vérifie, sinon on le calcule
-              let cost: number;
-              if (costText) {
-                const parsedCost = parseFloat(costText.replace(/[^\d.,]/g, "").replace(",", "."));
-                // Vérifier si le coût est réaliste (sinon recalculer avec les tarifs réglementés)
-                const expectedCost = calculateEnergyCost(consumption, undefined, undefined, 9);
-                if (!isNaN(parsedCost) && Math.abs(parsedCost - expectedCost) / expectedCost < 0.5) {
-                  cost = parsedCost;
-                } else {
-                  cost = expectedCost;
-                }
-              } else {
-                cost = calculateEnergyCost(consumption, undefined, undefined, 9);
-              }
 
               if (!isNaN(consumption) && !isNaN(date.getTime()) && date >= startDate && date <= endDate) {
                 data.push({
                   date: date.toISOString().split("T")[0],
                   consumption,
-                  cost,
+                  costText: costText || undefined,
                 });
               }
             }
@@ -411,7 +396,7 @@ export async function scrapeSiceaConsumption(
                           data.push({
                             date: itemDate.toISOString().split("T")[0],
                             consumption: parseFloat(item.consumption),
-                            cost: item.cost ? parseFloat(item.cost) : undefined,
+                            costText: item.cost ? String(parseFloat(item.cost)) : undefined,
                           });
                         }
                       }
@@ -494,8 +479,33 @@ export async function scrapeSiceaConsumption(
     }, { start: start.toISOString(), end: end.toISOString() });
 
     // Extraire les données et les infos du compteur
-    const extractedData = consumptionData.data || [];
+    const rawData = consumptionData.data || [];
     const meterInfo = consumptionData.meterInfo || {};
+    
+    // Calculer les coûts en dehors de page.evaluate() (dans le contexte Node.js)
+    const extractedData: SiceaConsumptionData[] = rawData.map((item) => {
+      let cost: number | undefined;
+      
+      // Si un coût est fourni par SICEA, on le vérifie, sinon on le calcule
+      if (item.costText) {
+        const parsedCost = parseFloat(item.costText.replace(/[^\d.,]/g, "").replace(",", "."));
+        // Vérifier si le coût est réaliste (sinon recalculer avec les tarifs réglementés)
+        const expectedCost = calculateEnergyCost(item.consumption, undefined, undefined, 9);
+        if (!isNaN(parsedCost) && Math.abs(parsedCost - expectedCost) / expectedCost < 0.5) {
+          cost = parsedCost;
+        } else {
+          cost = expectedCost;
+        }
+      } else {
+        cost = calculateEnergyCost(item.consumption, undefined, undefined, 9);
+      }
+      
+      return {
+        date: item.date,
+        consumption: item.consumption,
+        cost,
+      };
+    });
 
     // Si aucune donnée trouvée, essayer d'exporter en CSV
     if (extractedData.length === 0) {

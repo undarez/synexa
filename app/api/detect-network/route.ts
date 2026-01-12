@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
-import prisma from "@/app/lib/prisma";
+import { requireUser, UnauthorizedError } from "@/app/lib/auth/mock";
+import { supabase } from "@/app/lib/supabase/client";
 
 // API pour détecter les réseaux WiFi et Bluetooth
 // Note: Les APIs Web pour WiFi/Bluetooth sont limitées dans les navigateurs
@@ -33,17 +33,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Sauvegarder dans le profil
-    const updated = await prisma.user.update({
-      where: { id: user.id },
-      data: updateData,
-      select: {
-        id: true,
-        wifiEnabled: true,
-        wifiSSID: true,
-        bluetoothEnabled: true,
-        bluetoothDeviceName: true,
-      },
-    });
+    const now = new Date().toISOString();
+    const { data: updated, error } = await supabase
+      .from('User')
+      // @ts-ignore - Supabase infère 'never' mais les données sont valides
+      .update({
+        ...updateData,
+        updatedAt: now,
+      } as any)
+      .eq('id', user.id)
+      .select('id, wifiEnabled, wifiSSID, bluetoothEnabled, bluetoothDeviceName')
+      .single();
+
+    if (error || !updated) {
+      console.error('[POST /detect-network] Erreur:', error);
+      return NextResponse.json(
+        { error: 'Erreur lors de la mise à jour', details: error?.message },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ 
       success: true,

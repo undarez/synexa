@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/app/lib/auth/mock-client";
 import { redirect } from "next/navigation";
 import { Save, Loader2, User as UserIcon, MapPin, Building2, Wifi, Bluetooth, Navigation as NavigationIcon } from "lucide-react";
 import { Navigation } from "@/app/components/Navigation";

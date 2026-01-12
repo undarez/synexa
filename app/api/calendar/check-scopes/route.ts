@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
-import prisma from "@/app/lib/prisma";
+import { requireUser, UnauthorizedError } from "@/app/lib/auth/mock";
 import { getGoogleCalendarToken } from "@/app/lib/google-calendar";
 
 /**
@@ -10,26 +9,8 @@ export async function GET() {
   try {
     const user = await requireUser();
     
-    const account = await prisma.account.findFirst({
-      where: {
-        userId: user.id,
-        provider: "google",
-      },
-      select: {
-        scope: true,
-        access_token: true,
-        expires_at: true,
-        providerAccountId: true,
-      },
-    });
-
-    if (!account) {
-      return NextResponse.json({
-        hasAccount: false,
-        message: "Aucun compte Google trouvé",
-      });
-    }
-
+    // TODO: Récupérer les informations du compte Google depuis Supabase Auth
+    // Pour l'instant, on vérifie juste si un token est disponible
     const token = await getGoogleCalendarToken(user.id);
     
     // Tester directement avec l'API Google
@@ -58,12 +39,11 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      hasAccount: true,
-      scope: account.scope,
+      hasAccount: !!token,
       hasToken: !!token,
-      tokenExpired: account.expires_at ? account.expires_at * 1000 < Date.now() : null,
-      scopeContainsCalendar: account.scope?.includes("calendar") || false,
+      message: token ? "Token Google Calendar disponible" : "Aucun token Google Calendar trouvé",
       apiTest,
+      note: "Les informations de scope nécessiteront Supabase Auth pour être complètes",
     });
   } catch (error) {
     if (error instanceof UnauthorizedError) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/app/lib/auth/mock-client";
 import { redirect } from "next/navigation";
 import { Plus, Loader2, Wifi, Bluetooth, Settings, Trash2, Power } from "lucide-react";
 import { Navigation } from "@/app/components/Navigation";

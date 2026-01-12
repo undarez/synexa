@@ -257,20 +257,22 @@ export function LowerThird({ className = "" }: LowerThirdProps) {
         backgroundSize: '300% 300%',
         backgroundPosition: 'center center',
       }}
+      suppressHydrationWarning
     >
       {/* Overlay avec effet de flou dynamique */}
       <div 
         className={`absolute inset-0 bg-[hsl(var(--background))]/80 backdrop-blur-xl lower-third-fade transition-opacity duration-700 ease-in-out ${
           isVisible ? "opacity-100" : "opacity-0"
         }`}
+        suppressHydrationWarning
       />
 
       {/* Contenu centré */}
       <div className={`relative z-10 flex flex-col items-center justify-center gap-6 transition-all duration-700 ease-in-out ${
         isVisible ? "translate-y-0 opacity-100 scale-100" : "translate-y-8 opacity-0 scale-95"
-      }`}>
+      }`} suppressHydrationWarning>
         {/* Sphère animée au centre (grande version) */}
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0" suppressHydrationWarning>
           <canvas
             ref={largeCanvasRef}
             className="h-[120px] w-[120px] drop-shadow-2xl"
@@ -279,7 +281,7 @@ export function LowerThird({ className = "" }: LowerThirdProps) {
         </div>
 
         {/* Message */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3" suppressHydrationWarning>
           <Icon className={`h-6 w-6 ${iconColor} animate-pulse`} />
           <span className="text-xl font-semibold text-white drop-shadow-lg whitespace-nowrap">
             {pageMessage}
@@ -287,7 +289,7 @@ export function LowerThird({ className = "" }: LowerThirdProps) {
         </div>
 
         {/* Indicateur de mouvement */}
-        <div className="flex gap-2">
+        <div className="flex gap-2" suppressHydrationWarning>
           {[0, 1, 2].map((i) => (
             <div
               key={i}
@@ -296,6 +298,7 @@ export function LowerThird({ className = "" }: LowerThirdProps) {
                 animationDelay: `${i * 0.2}s`,
                 animationDuration: "1.5s",
               }}
+              suppressHydrationWarning
             />
           ))}
         </div>
@@ -306,9 +309,10 @@ export function LowerThird({ className = "" }: LowerThirdProps) {
         className={`absolute bottom-0 left-0 right-0 flex items-center justify-center gap-4 border-t-2 border-white/20 bg-[hsl(var(--background))]/90 backdrop-blur-md px-6 py-4 transition-all duration-700 ease-in-out ${
           isVisible ? "translate-y-0 opacity-100" : "translate-y-full opacity-0"
         }`}
+        suppressHydrationWarning
       >
         {/* Sphère animée au centre du lower third */}
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0" suppressHydrationWarning>
           <canvas
             ref={canvasRef}
             className="h-[60px] w-[60px]"
@@ -317,7 +321,7 @@ export function LowerThird({ className = "" }: LowerThirdProps) {
         </div>
 
         {/* Message */}
-        <div className="flex items-center gap-2 flex-1 justify-center">
+        <div className="flex items-center gap-2 flex-1 justify-center" suppressHydrationWarning>
           <Icon className={`h-5 w-5 ${iconColor} animate-pulse`} />
           <span className="text-base font-medium text-[hsl(var(--foreground))] whitespace-nowrap">
             {pageMessage}
@@ -325,7 +329,7 @@ export function LowerThird({ className = "" }: LowerThirdProps) {
         </div>
 
         {/* Indicateur de mouvement */}
-        <div className="flex gap-1 flex-shrink-0">
+        <div className="flex gap-1 flex-shrink-0" suppressHydrationWarning>
           {[0, 1, 2].map((i) => (
             <div
               key={i}
@@ -334,6 +338,7 @@ export function LowerThird({ className = "" }: LowerThirdProps) {
                 animationDelay: `${i * 0.2}s`,
                 animationDuration: "1.5s",
               }}
+              suppressHydrationWarning
             />
           ))}
         </div>

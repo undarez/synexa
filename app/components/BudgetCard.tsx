@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/ca
 import { Button } from "@/app/components/ui/button";
 import { Progress } from "@/app/components/ui/progress";
 import { Edit, Trash2, AlertTriangle } from "lucide-react";
-import type { Budget, ExpenseCategory } from "@prisma/client";
+import type { ExpenseCategory } from "@/app/lib/supabase/types";
 import {
   Utensils,
   Car,

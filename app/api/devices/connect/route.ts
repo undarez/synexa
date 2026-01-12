@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
+import { requireUser } from "@/app/lib/auth/mock";
 import { connectDevice, type DiscoveredDevice } from "@/app/lib/devices/discovery";
-import prisma from "@/app/lib/prisma";
-import { DeviceType } from "@prisma/client";
-import { toJsonInput } from "@/app/lib/prisma/json";
+import { supabase } from "@/app/lib/supabase/client";
+import { DeviceType } from "@/app/lib/supabase/types";
 
 /**
  * Connecte un device découvert et l'ajoute à la base de données
@@ -37,31 +36,46 @@ export async function POST(request: NextRequest) {
 
     const connectedDevice = connectionResult.device!;
 
+    const now = new Date().toISOString();
+    
     // Vérifier si le device existe déjà
-    const existingDevice = await prisma.device.findUnique({
-      where: {
-        provider_externalId: {
-          provider: connectedDevice.provider,
-          externalId: connectedDevice.id,
-        },
-      },
-    });
+    type ExistingDevice = { id: string };
+    const { data: existingDevice } = await supabase
+      .from('Device')
+      .select('*')
+      .eq('provider', connectedDevice.provider)
+      .eq('externalId', connectedDevice.id)
+      .single();
 
-    if (existingDevice) {
+    const typedExistingDevice = existingDevice as ExistingDevice | null;
+
+    if (typedExistingDevice) {
       // Mettre à jour le device existant
-      const updated = await prisma.device.update({
-        where: { id: existingDevice.id },
-        data: {
+      const { data: updated, error: updateError } = await supabase
+        .from('Device')
+        // @ts-ignore - Supabase infère 'never' mais les données sont valides
+        .update({
           name: connectedDevice.name,
           type: connectedDevice.type,
-          capabilities: toJsonInput({
+          capabilities: {
             actions: connectedDevice.capabilities,
             ...connectedDevice.metadata,
-          }),
-          metadata: toJsonInput(connectedDevice.metadata),
-          lastSeenAt: new Date(),
-        },
-      });
+          },
+          metadata: connectedDevice.metadata,
+          lastSeenAt: now,
+          updatedAt: now,
+        } as any)
+        .eq('id', typedExistingDevice.id)
+        .select()
+        .single();
+
+      if (updateError || !updated) {
+        console.error('[POST /devices/connect] Erreur mise à jour:', updateError);
+        return NextResponse.json(
+          { error: 'Erreur lors de la mise à jour du device', details: updateError?.message },
+          { status: 500 }
+        );
+      }
 
       return NextResponse.json({
         success: true,
@@ -71,23 +85,36 @@ export async function POST(request: NextRequest) {
     }
 
     // Créer un nouveau device
-    const device = await prisma.device.create({
-      data: {
+    // @ts-ignore - Supabase infère 'never' mais les données sont valides
+    const { data: device, error: createError } = await supabase
+      .from('Device')
+      .insert({
         userId: user.id,
         name: connectedDevice.name,
         room: null,
         provider: connectedDevice.provider,
         externalId: connectedDevice.id,
         type: connectedDevice.type,
-        capabilities: toJsonInput({
+        capabilities: {
           actions: connectedDevice.capabilities,
           connectionType: connectedDevice.connectionType,
           ...connectedDevice.metadata,
-        }),
-        metadata: toJsonInput(connectedDevice.metadata),
-        lastSeenAt: new Date(),
-      },
-    });
+        },
+        metadata: connectedDevice.metadata,
+        lastSeenAt: now,
+        createdAt: now,
+        updatedAt: now,
+      } as any)
+      .select()
+      .single();
+
+    if (createError || !device) {
+      console.error('[POST /devices/connect] Erreur création:', createError);
+      return NextResponse.json(
+        { error: 'Erreur lors de la création du device', details: createError?.message },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,

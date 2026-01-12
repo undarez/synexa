@@ -22,8 +22,7 @@ import {
 } from "@/app/components/ui/dialog";
 import { RoutineStepEditor, type RoutineStep } from "@/app/components/RoutineStepEditor";
 import { NaturalLanguageRoutineInput } from "@/app/components/NaturalLanguageRoutineInput";
-import { RoutineTriggerType, RoutineActionType } from "@prisma/client";
-import type { Routine } from "@prisma/client";
+import { RoutineTriggerType, RoutineActionType, type Routine } from "@/app/lib/supabase/types";
 import type { ParsedRoutine } from "@/app/lib/ai/routine-parser";
 
 interface RoutineFormProps {

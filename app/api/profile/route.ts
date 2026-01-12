@@ -1,160 +1,84 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/app/lib/prisma";
-import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
+import { supabase } from "@/app/lib/supabase/client";
+import { requireUser, UnauthorizedError } from "@/app/lib/auth/mock";
 import { generateUserCode } from "@/app/lib/user-code";
 import { encryptUserData, decryptUserData } from "@/app/lib/encryption-helpers";
 import { logger } from "@/app/lib/logger";
-import type { Prisma } from "@prisma/client";
 
 export async function GET() {
   let user;
   try {
     user = await requireUser();
     
-    // Essayer de récupérer avec les nouveaux champs, avec fallback si les colonnes n'existent pas
-    let userProfile;
-    try {
-      userProfile = await prisma.user.findUnique({
-        where: { id: user.id },
-        select: {
-          id: true,
-          userCode: true,
-          pseudo: true,
-          firstName: true,
-          lastName: true,
-          homeAddress: true,
-          workAddress: true,
-          workLat: true,
-          workLng: true,
-          email: true,
-          image: true,
-          wifiEnabled: true,
-          wifiSSID: true,
-          bluetoothEnabled: true,
-          bluetoothDeviceName: true,
-          mobileDataEnabled: true,
-          meterSerialNumber: true,
-          siceaRPM: true,
-        },
-      });
+    // Récupérer le profil utilisateur avec Supabase
+    const { data: userProfile, error: fetchError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('id', user.id)
+      .single();
 
-      // Si l'utilisateur n'existe pas, le créer avec les informations de la session
-      if (!userProfile) {
-        userProfile = await prisma.user.create({
-          data: {
-            id: user.id,
-            email: user.email || null,
-            name: user.name || null,
-            image: user.image || null,
-          },
-          select: {
-            id: true,
-            userCode: true,
-            pseudo: true,
-            firstName: true,
-            lastName: true,
-            homeAddress: true,
-            workAddress: true,
-            workLat: true,
-            workLng: true,
-            email: true,
-            image: true,
-          },
-        });
+    // Si l'utilisateur n'existe pas, le créer avec les informations de la session
+    if (fetchError || !userProfile) {
+      const now = new Date().toISOString();
+      const { data: newUser, error: createError } = await supabase
+        .from('User')
+        .insert({
+          id: user.id,
+          email: user.email || null,
+          name: user.name || null,
+          image: user.image || null,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .select()
+        .single();
+
+      if (createError || !newUser) {
+        console.error('[GET /profile] Erreur création utilisateur:', createError);
+        return NextResponse.json(
+          { error: 'Erreur lors de la création du profil', details: createError?.message },
+          { status: 500 }
+        );
       }
-    } catch (error: unknown) {
-      // Si les colonnes n'existent pas encore, utiliser les champs de base
-      const isPrismaError = error && typeof error === "object" && ("code" in error || "message" in error);
-      const errorCode = isPrismaError && "code" in error ? String(error.code) : undefined;
-      const errorMessage = isPrismaError && "message" in error && typeof error.message === "string" ? error.message : "";
-      
-      if (errorCode === "P2022" || errorMessage.includes("does not exist")) {
-        userProfile = await prisma.user.findUnique({
-          where: { id: user.id },
-          select: {
-            id: true,
-            email: true,
-            image: true,
-            name: true,
-          },
-        });
-        
-        // Si l'utilisateur n'existe toujours pas, le créer
-        if (!userProfile) {
-          userProfile = await prisma.user.create({
-            data: {
-              id: user.id,
-              email: user.email || null,
-              name: user.name || null,
-              image: user.image || null,
-            },
-            select: {
-              id: true,
-              email: true,
-              image: true,
-              name: true,
-            },
-          });
-        }
-        
-        // Ajouter les champs manquants avec null (type assertion nécessaire pour compatibilité)
-        if (userProfile) {
-          const extendedProfile = userProfile as typeof userProfile & {
-            userCode: string | null;
-            pseudo: string | null;
-            firstName: string | null;
-            lastName: string | null;
-            homeAddress: string | null;
-            workAddress: string | null;
-            workLat: number | null;
-            workLng: number | null;
-          };
-          extendedProfile.userCode = null;
-          extendedProfile.pseudo = null;
-          extendedProfile.firstName = null;
-          extendedProfile.lastName = null;
-          extendedProfile.homeAddress = null;
-          extendedProfile.workAddress = null;
-          extendedProfile.workLat = null;
-          extendedProfile.workLng = null;
-          userProfile = extendedProfile;
-        }
-      } else {
-        throw error;
-      }
+
+      // Déchiffrer les données sensibles avant de les retourner
+      const decryptedProfile = decryptUserData(newUser as any);
+      logger.info("Profil utilisateur créé", { userId: user.id });
+      return NextResponse.json({ profile: decryptedProfile });
     }
 
-    // Si l'utilisateur n'a pas de code, en générer un (seulement si la colonne existe)
-    if (userProfile && !(userProfile as any).userCode) {
+    // Si l'utilisateur n'a pas de code, en générer un
+    if (!userProfile.userCode) {
       try {
-        let newCode: string;
+        let newCode: string | undefined;
         let isUnique = false;
         let attempts = 0;
         
         // S'assurer que le code est unique
         while (!isUnique && attempts < 10) {
           newCode = generateUserCode();
-          const existing = await prisma.user.findUnique({
-            where: { userCode: newCode },
-          });
+          const { data: existing } = await supabase
+            .from('User')
+            .select('id')
+            .eq('userCode', newCode)
+            .single();
+          
           if (!existing) {
             isUnique = true;
           }
           attempts++;
         }
         
-        if (isUnique && newCode!) {
-          await prisma.user.update({
-            where: { id: user.id },
-            data: { userCode: newCode },
-          });
-          (userProfile as any).userCode = newCode;
+        if (isUnique && newCode) {
+          await supabase
+            .from('User')
+            .update({ userCode: newCode, updatedAt: new Date().toISOString() })
+            .eq('id', user.id);
+          userProfile.userCode = newCode;
         }
       } catch (error: any) {
-        // Si la colonne userCode n'existe pas encore, ignorer l'erreur
-        if (error?.code !== "P2022" && !error?.message?.includes("does not exist")) {
-          throw error;
-        }
+        // Ignorer les erreurs de génération de code
+        logger.warn("Erreur lors de la génération du code utilisateur", error);
       }
     }
 
@@ -248,109 +172,71 @@ export async function PATCH(request: NextRequest) {
     const encryptedData = encryptUserData(updateData);
 
     // Vérifier d'abord si l'utilisateur existe, sinon le créer
-    let existingUser;
-    try {
-      existingUser = await prisma.user.findUnique({
-        where: { id: user.id },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          image: true,
-        },
-      });
-    } catch (error: any) {
-      // Si les colonnes n'existent pas encore, essayer sans select
-      if (error?.code === "P2022" || error?.message?.includes("does not exist")) {
-        existingUser = await prisma.user.findUnique({
-          where: { id: user.id },
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            image: true,
-          },
-        });
-      } else {
-        throw error;
-      }
-    }
+    const { data: existingUser, error: fetchError } = await supabase
+      .from('User')
+      .select('id, email, name, image')
+      .eq('id', user.id)
+      .single();
 
-    if (!existingUser) {
-      // L'utilisateur n'existe pas dans la base de données (probablement après une réinitialisation)
-      // Le créer avec les informations de la session
-      existingUser = await prisma.user.create({
-        data: {
+    if (fetchError || !existingUser) {
+      // L'utilisateur n'existe pas dans la base de données, le créer
+      const now = new Date().toISOString();
+      const { data: newUser, error: createError } = await supabase
+        .from('User')
+        .insert({
           id: user.id,
           email: user.email || null,
           name: user.name || null,
           image: user.image || null,
-        },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          image: true,
-        },
-      });
-    }
+          ...encryptedData,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .select()
+        .single();
 
-    try {
-      const updated = await prisma.user.update({
-        where: { id: user.id },
-        data: encryptedData,
-        select: {
-          id: true,
-          userCode: true,
-          pseudo: true,
-          firstName: true,
-          lastName: true,
-          homeAddress: true,
-          workAddress: true,
-          workLat: true,
-          workLng: true,
-          email: true,
-          image: true,
-          wifiEnabled: true,
-          wifiSSID: true,
-          bluetoothEnabled: true,
-          bluetoothDeviceName: true,
-          mobileDataEnabled: true,
-          meterSerialNumber: true,
-          siceaRPM: true,
-        },
-      });
-
-      // Déchiffrer les données sensibles avant de les retourner
-      const decryptedProfile = decryptUserData(updated as any);
-
-      logger.info("Profil utilisateur mis à jour", {
-        userId: user.id,
-        fieldsUpdated: Object.keys(updateData),
-      });
-
-      return NextResponse.json({ profile: decryptedProfile });
-    } catch (error: any) {
-      // Si les colonnes n'existent pas encore, retourner une erreur explicite
-      if (error?.code === "P2022" || error?.message?.includes("does not exist")) {
+      if (createError || !newUser) {
+        console.error('[PATCH /profile] Erreur création utilisateur:', createError);
         return NextResponse.json(
-          { 
-            error: "La base de données doit être mise à jour. Veuillez exécuter: npx prisma db push" 
-          },
+          { error: 'Erreur lors de la création du profil', details: createError?.message },
           { status: 500 }
         );
       }
-      // Gérer l'erreur P2025 (utilisateur non trouvé)
-      if (error?.code === "P2025") {
-        return NextResponse.json(
-          { 
-            error: "Votre session n'est plus valide. Veuillez vous déconnecter et vous reconnecter." 
-          },
-          { status: 404 }
-        );
-      }
-      throw error;
+
+      // Déchiffrer les données sensibles avant de les retourner
+      const decryptedProfile = decryptUserData(newUser as any);
+      logger.info("Profil utilisateur créé", { userId: user.id });
+      return NextResponse.json({ profile: decryptedProfile });
     }
+
+    // Mettre à jour l'utilisateur
+    const { data: updated, error: updateError } = await supabase
+      .from('User')
+      .update({
+        ...encryptedData,
+        updatedAt: new Date().toISOString(),
+      })
+      .eq('id', user.id)
+      .select()
+      .single();
+
+    if (updateError || !updated) {
+      console.error('[PATCH /profile] Erreur mise à jour:', updateError);
+      return NextResponse.json(
+        { error: 'Erreur lors de la mise à jour du profil', details: updateError?.message },
+        { status: 500 }
+      );
+    }
+
+    // Déchiffrer les données sensibles avant de les retourner
+    const decryptedProfile = decryptUserData(updated as any);
+
+    logger.info("Profil utilisateur mis à jour", {
+      userId: user.id,
+      fieldsUpdated: Object.keys(updateData),
+    });
+
+    return NextResponse.json({ profile: decryptedProfile });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       logger.warn("Tentative de mise à jour non autorisée du profil");

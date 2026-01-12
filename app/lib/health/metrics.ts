@@ -2,8 +2,19 @@
  * Service de gestion des métriques de santé
  */
 
-import prisma from "@/app/lib/prisma";
-import { HealthMetricType, HealthMetric } from "@prisma/client";
+import { supabase } from "@/app/lib/supabase/client";
+import { HealthMetricType } from "@/app/lib/supabase/types";
+
+export interface HealthMetric {
+  id: string;
+  userId: string;
+  type: HealthMetricType;
+  value: number;
+  unit?: string | null;
+  source?: string | null;
+  recordedAt: Date;
+  metadata?: any;
+}
 
 export interface HealthMetricInput {
   type: HealthMetricType;
@@ -37,17 +48,30 @@ export async function createHealthMetric(
   userId: string,
   input: HealthMetricInput
 ) {
-  return await prisma.healthMetric.create({
-    data: {
+  const now = new Date().toISOString();
+  const recordedAt = input.recordedAt || new Date();
+  
+  const { data: metric, error } = await supabase
+    .from('HealthMetric')
+    .insert({
       userId,
       type: input.type,
       value: input.value,
-      unit: input.unit,
+      unit: input.unit || null,
       source: input.source || "manual",
-      recordedAt: input.recordedAt || new Date(),
-      metadata: input.metadata || {},
-    },
-  });
+      recordedAt: recordedAt.toISOString(),
+      metadata: input.metadata || null,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .select()
+    .single();
+
+  if (error || !metric) {
+    throw new Error(`Erreur lors de la création de la métrique: ${error?.message}`);
+  }
+
+  return metric as HealthMetric;
 }
 
 /**
@@ -62,27 +86,39 @@ export async function getHealthMetrics(
     limit?: number;
   }
 ) {
-  const where: any = { userId };
+  let query = supabase
+    .from('HealthMetric')
+    .select('*')
+    .eq('userId', userId);
 
   if (options?.type) {
-    where.type = options.type;
+    query = query.eq('type', options.type);
   }
 
-  if (options?.startDate || options?.endDate) {
-    where.recordedAt = {};
-    if (options.startDate) {
-      where.recordedAt.gte = options.startDate;
-    }
-    if (options.endDate) {
-      where.recordedAt.lte = options.endDate;
-    }
+  if (options?.startDate) {
+    query = query.gte('recordedAt', options.startDate.toISOString());
+  }
+  if (options?.endDate) {
+    query = query.lte('recordedAt', options.endDate.toISOString());
   }
 
-  return await prisma.healthMetric.findMany({
-    where,
-    orderBy: { recordedAt: "desc" },
-    take: options?.limit || 100,
-  });
+  query = query.order('recordedAt', { ascending: false });
+
+  if (options?.limit) {
+    query = query.limit(options.limit);
+  } else {
+    query = query.limit(100);
+  }
+
+  const { data: metrics, error } = await query;
+
+  if (error) {
+    console.error("[Health Metrics] Erreur récupération métriques:", error);
+    // Retourner un tableau vide plutôt que de lancer une erreur
+    return [];
+  }
+
+  return (metrics || []) as HealthMetric[];
 }
 
 /**
@@ -95,22 +131,27 @@ export async function getHealthMetricsSummary(
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
 
-  const metrics = await prisma.healthMetric.findMany({
-    where: {
-      userId,
-      recordedAt: { gte: startDate },
-    },
-    orderBy: { recordedAt: "desc" },
-  });
+  const { data: metrics, error } = await supabase
+    .from('HealthMetric')
+    .select('*')
+    .eq('userId', userId)
+    .gte('recordedAt', startDate.toISOString())
+    .order('recordedAt', { ascending: false });
+
+  if (error) {
+    console.error("[Health Metrics] Erreur récupération métriques:", error);
+    // Retourner un résumé vide plutôt que de lancer une erreur
+    return [];
+  }
 
   // Grouper par type
-  const grouped = metrics.reduce((acc: Record<string, typeof metrics>, metric: HealthMetric) => {
+  const grouped = (metrics || []).reduce((acc: Record<string, HealthMetric[]>, metric: any) => {
     if (!acc[metric.type]) {
       acc[metric.type] = [];
     }
-    acc[metric.type].push(metric);
+    acc[metric.type].push(metric as HealthMetric);
     return acc;
-  }, {} as Record<HealthMetricType, typeof metrics>);
+  }, {} as Record<HealthMetricType, HealthMetric[]>);
 
   const summaries: HealthMetricsSummary[] = [];
 
@@ -143,7 +184,7 @@ export async function getHealthMetricsSummary(
       latest: {
         value: latest.value,
         unit: latest.unit || undefined,
-        recordedAt: latest.recordedAt,
+        recordedAt: new Date(latest.recordedAt),
       },
       average: {
         value: average,
@@ -169,26 +210,38 @@ export async function getHealthMetricsByType(
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
 
-  return await prisma.healthMetric.findMany({
-    where: {
-      userId,
-      type,
-      recordedAt: { gte: startDate },
-    },
-    orderBy: { recordedAt: "asc" },
-  });
+  const { data: metrics, error } = await supabase
+    .from('HealthMetric')
+    .select('*')
+    .eq('userId', userId)
+    .eq('type', type)
+    .gte('recordedAt', startDate.toISOString())
+    .order('recordedAt', { ascending: true });
+
+  if (error) {
+    console.error("[Health Metrics] Erreur récupération métriques par type:", error);
+    return [];
+  }
+
+  return (metrics || []) as HealthMetric[];
 }
 
 /**
  * Supprime une métrique de santé
  */
 export async function deleteHealthMetric(metricId: string, userId: string) {
-  return await prisma.healthMetric.deleteMany({
-    where: {
-      id: metricId,
-      userId,
-    },
-  });
+  const { error } = await supabase
+    .from('HealthMetric')
+    .delete()
+    .eq('id', metricId)
+    .eq('userId', userId);
+
+  if (error) {
+    console.error("[Health Metrics] Erreur suppression métrique:", error);
+    throw new Error(`Erreur lors de la suppression de la métrique: ${error.message}`);
+  }
+
+  return { success: true };
 }
 
 

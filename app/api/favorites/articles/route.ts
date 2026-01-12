@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
-import prisma from "@/app/lib/prisma";
+import { requireUser } from "@/app/lib/auth/mock";
+import { supabase } from "@/app/lib/supabase/client";
 import type { NewsArticle } from "@/app/lib/services/news";
 
 /**
@@ -10,24 +10,18 @@ export async function GET() {
   try {
     const user = await requireUser();
     
-    // Vérifier si la table existe, sinon retourner un tableau vide
-    try {
-      const favorites = await prisma.favoriteArticle.findMany({
-        where: { userId: user.id },
-        orderBy: { createdAt: "desc" },
-      });
+    const { data: favorites, error } = await supabase
+      .from('FavoriteArticle')
+      .select('*')
+      .eq('userId', user.id)
+      .order('createdAt', { ascending: false });
 
-      return NextResponse.json({ favorites });
-    } catch (dbError: any) {
-      // Si la table n'existe pas encore, retourner un tableau vide
-      if (dbError.message?.includes("does not exist") || 
-          dbError.message?.includes("no such table") ||
-          dbError.message?.includes("Cannot read properties of undefined")) {
-        console.warn("[GET /api/favorites/articles] Table FavoriteArticle n'existe pas encore, retour vide");
-        return NextResponse.json({ favorites: [] });
-      }
-      throw dbError;
+    if (error) {
+      console.error('[GET /api/favorites/articles] Erreur Supabase:', error);
+      return NextResponse.json({ favorites: [] });
     }
+
+    return NextResponse.json({ favorites: favorites || [] });
   } catch (error) {
     console.error("[GET /api/favorites/articles]", error);
     // En cas d'erreur, retourner un tableau vide plutôt qu'une erreur 500
@@ -51,44 +45,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    try {
-      const favorite = await prisma.favoriteArticle.upsert({
-        where: {
-          userId_url: {
-            userId: user.id,
-            url: article.url,
-          },
-        },
-        update: {
-          updatedAt: new Date(),
-        },
-        create: {
-          userId: user.id,
-          title: article.title,
-          description: article.description || null,
-          url: article.url,
-          source: article.source,
-          imageUrl: article.imageUrl || null,
-          publishedAt: new Date(article.publishedAt),
-          category: article.category || null,
-          metadata: article as any,
-        },
-      });
+    const now = new Date().toISOString();
+    
+    const { data: favorite, error } = await supabase
+      .from('FavoriteArticle')
+      // @ts-expect-error - Le type Database.Update est any, mais TypeScript ne l'infère pas correctement
+      .upsert({
+        userId: user.id,
+        title: article.title,
+        description: article.description || null,
+        url: article.url,
+        source: article.source,
+        imageUrl: article.imageUrl || null,
+        publishedAt: new Date(article.publishedAt).toISOString(),
+        category: article.category || null,
+        metadata: article as any,
+        updatedAt: now,
+      }, {
+        onConflict: 'userId,url',
+      })
+      .select()
+      .single();
 
-      return NextResponse.json({ favorite, added: true });
-    } catch (dbError: any) {
-      // Si la table n'existe pas encore, informer l'utilisateur
-      if (dbError.message?.includes("does not exist") || 
-          dbError.message?.includes("no such table") ||
-          dbError.message?.includes("Cannot read properties of undefined")) {
-        console.warn("[POST /api/favorites/articles] Table FavoriteArticle n'existe pas encore");
-        return NextResponse.json(
-          { error: "La fonctionnalité de favoris n'est pas encore disponible. Veuillez redémarrer le serveur après la migration de la base de données." },
-          { status: 503 }
-        );
-      }
-      throw dbError;
+    if (error) {
+      console.error('[POST /api/favorites/articles] Erreur Supabase:', error);
+      return NextResponse.json(
+        { error: 'Erreur lors de l\'ajout du favori', details: error.message },
+        { status: 500 }
+      );
     }
+
+    return NextResponse.json({ favorite, added: true });
   } catch (error) {
     console.error("[POST /api/favorites/articles]", error);
     return NextResponse.json(
@@ -114,24 +101,19 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    try {
-      await prisma.favoriteArticle.deleteMany({
-        where: {
-          userId: user.id,
-          url: url,
-        },
-      });
+    const { error } = await supabase
+      .from('FavoriteArticle')
+      .delete()
+      .eq('userId', user.id)
+      .eq('url', url);
 
+    if (error) {
+      console.error('[DELETE /api/favorites/articles] Erreur Supabase:', error);
+      // Considérer comme déjà supprimé en cas d'erreur
       return NextResponse.json({ deleted: true });
-    } catch (dbError: any) {
-      // Si la table n'existe pas encore, considérer comme déjà supprimé
-      if (dbError.message?.includes("does not exist") || 
-          dbError.message?.includes("no such table") ||
-          dbError.message?.includes("Cannot read properties of undefined")) {
-        return NextResponse.json({ deleted: true });
-      }
-      throw dbError;
     }
+
+    return NextResponse.json({ deleted: true });
   } catch (error) {
     console.error("[DELETE /api/favorites/articles]", error);
     return NextResponse.json(

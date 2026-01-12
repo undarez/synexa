@@ -2,11 +2,10 @@
  * Service de personnalisation des actualités selon les préférences utilisateur
  */
 
-import prisma from "@/app/lib/prisma";
+import { supabase } from "@/app/lib/supabase/client";
 import { searchNews, type NewsArticle, type NewsCategory } from "./news";
-import type { Preference } from "@prisma/client";
-import { Prisma } from "@prisma/client";
-import { toJsonInput } from "@/app/lib/prisma/json";
+import { toJsonInput } from "@/app/lib/supabase/helpers";
+import { generateId } from "@/app/lib/supabase/helpers";
 
 export interface NewsPreferences {
   preferredCategories?: NewsCategory[];
@@ -21,14 +20,15 @@ export interface NewsPreferences {
  */
 export async function getUserNewsPreferences(userId: string): Promise<NewsPreferences> {
   try {
-    const preferences = await prisma.preference.findMany({
-      where: {
-        userId,
-        key: {
-          startsWith: "news_",
-        },
-      },
-    });
+    const { data: preferences, error } = await supabase
+      .from('Preference')
+      .select('*')
+      .eq('userId', userId)
+      .like('key', 'news_%');
+
+    if (error) {
+      console.error("[News Personalization] Erreur récupération préférences:", error);
+    }
 
     const prefs: NewsPreferences = {
       preferredCategories: [],
@@ -38,7 +38,7 @@ export async function getUserNewsPreferences(userId: string): Promise<NewsPrefer
       maxArticles: 20,
     };
 
-    preferences.forEach((pref: Preference) => {
+    (preferences || []).forEach((pref: { key: string; value: unknown }) => {
       const value = pref.value as unknown;
       switch (pref.key) {
         case "news_categories":
@@ -83,22 +83,22 @@ export async function getUserNewsPreferences(userId: string): Promise<NewsPrefer
 async function inferPreferredCategories(userId: string): Promise<NewsCategory[]> {
   try {
     // Analyser les recherches d'actualités précédentes
-    const activities = await prisma.userActivity.findMany({
-      where: {
-        userId,
-        activityType: "news_viewed",
-        createdAt: {
-          gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 derniers jours
-        },
-      },
-      select: {
-        metadata: true,
-      },
-      take: 50,
-    });
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    
+    const { data: activities, error } = await supabase
+      .from('UserActivity')
+      .select('metadata')
+      .eq('userId', userId)
+      .eq('activityType', 'news_viewed')
+      .gte('createdAt', thirtyDaysAgo)
+      .limit(50);
+
+    if (error) {
+      console.error("[News Personalization] Erreur récupération activités:", error);
+    }
 
     const categoryCounts: Record<string, number> = {};
-    activities.forEach((activity: { metadata: unknown }) => {
+    (activities || []).forEach((activity: { metadata: unknown }) => {
       const metadata = activity.metadata as Record<string, unknown> | null;
       if (metadata && typeof metadata.category === "string") {
         categoryCounts[metadata.category] = (categoryCounts[metadata.category] || 0) + 1;
@@ -221,23 +221,36 @@ export async function saveNewsPreference(
   key: string,
   value: unknown
 ): Promise<void> {
-  const jsonValue = toJsonInput(value) ?? Prisma.JsonNull;
-  await prisma.preference.upsert({
-    where: {
-      userId_key: {
-        userId,
-        key: `news_${key}`,
-      },
-    },
-    update: {
-      value: jsonValue,
-    },
-    create: {
+  const now = new Date().toISOString();
+  const preferenceKey = `news_${key}`;
+  
+  // Vérifier si la préférence existe déjà
+  const { data: existing } = await supabase
+    .from('Preference')
+    .select('id')
+    .eq('userId', userId)
+    .eq('key', preferenceKey)
+    .single();
+  
+  const preferenceId = existing?.id || generateId();
+  
+  const { error } = await supabase
+    .from('Preference')
+    // @ts-expect-error - Le type Database.Insert est any, mais TypeScript ne l'infère pas correctement
+    .upsert({
+      id: preferenceId,
       userId,
-      key: `news_${key}`,
-      value: jsonValue,
-    },
-  });
+      key: preferenceKey,
+      value: toJsonInput(value) ?? null,
+      updatedAt: now,
+    }, {
+      onConflict: 'userId,key',
+    });
+
+  if (error) {
+    console.error("[News Personalization] Erreur sauvegarde préférence:", error);
+    throw new Error(`Erreur lors de la sauvegarde de la préférence: ${error.message}`);
+  }
 }
 
 /**
@@ -248,8 +261,12 @@ export async function trackNewsActivity(
   article: NewsArticle
 ): Promise<void> {
   try {
-    await prisma.userActivity.create({
-      data: {
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from('UserActivity')
+      // @ts-expect-error - Le type Database.Insert est any, mais TypeScript ne l'infère pas correctement
+      .insert({
+        id: generateId(),
         userId,
         activityType: "news_viewed",
         entityType: "NewsArticle",
@@ -259,8 +276,13 @@ export async function trackNewsActivity(
           category: article.category,
           url: article.url,
         },
-      },
-    });
+        createdAt: now,
+        updatedAt: now,
+      });
+
+    if (error) {
+      console.error("[News Personalization] Erreur tracking:", error);
+    }
   } catch (error) {
     console.error("[News Personalization] Erreur tracking:", error);
   }

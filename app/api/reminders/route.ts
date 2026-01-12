@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
-import prisma from "@/app/lib/prisma";
-import { ReminderType, ReminderStatus } from "@prisma/client";
+import { requireUser, UnauthorizedError } from "@/app/lib/auth/mock";
+import { supabase } from "@/app/lib/supabase/client";
+import { ReminderType, ReminderStatus } from "@/app/lib/supabase/types";
 import { calculateIntelligentReminder } from "@/app/lib/reminders/intelligent-calculator";
-import { toJsonInput } from "@/app/lib/prisma/json";
 import { logger } from "@/app/lib/logger";
+import { generateId } from "@/app/lib/supabase/helpers";
 
 type ReminderPayload = {
   calendarEventId?: string;
@@ -49,11 +49,14 @@ export async function POST(request: NextRequest) {
 
     // Si un événement est associé, calculer intelligemment
     if (body.calendarEventId) {
-      const event = await prisma.calendarEvent.findFirst({
-        where: { id: body.calendarEventId, userId: user.id },
-      });
+      const { data: event, error: eventError } = await supabase
+        .from('CalendarEvent')
+        .select('*')
+        .eq('id', body.calendarEventId)
+        .eq('userId', user.id)
+        .single();
 
-      if (!event) {
+      if (eventError || !event) {
         return NextResponse.json(
           { error: "Événement introuvable" },
           { status: 404 }
@@ -84,14 +87,14 @@ export async function POST(request: NextRequest) {
         } catch (error) {
           console.error("[POST /reminders] Erreur calcul intelligent:", error);
           // Fallback : calcul simple
-          scheduledFor = new Date(event.start);
+          scheduledFor = new Date(event.start as string);
           scheduledFor.setMinutes(
             scheduledFor.getMinutes() - (body.minutesBefore || 15)
           );
         }
       } else {
         // Calcul simple
-        scheduledFor = new Date(event.start);
+        scheduledFor = new Date(event.start as string);
         scheduledFor.setMinutes(
           scheduledFor.getMinutes() - (body.minutesBefore || 15)
         );
@@ -113,24 +116,40 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const reminder = await prisma.reminder.create({
-      data: {
+    const now = new Date().toISOString();
+    const reminderId = generateId();
+    
+    const { data: reminder, error: createError } = await supabase
+      .from('Reminder')
+      .insert({
+        id: reminderId,
         userId: user.id,
         calendarEventId: body.calendarEventId || null,
         title: body.title,
         message: body.message || null,
         reminderType: body.reminderType,
-        scheduledFor,
+        scheduledFor: scheduledFor.toISOString(),
         includeTraffic: body.includeTraffic || false,
         includeWeather: body.includeWeather || false,
-        trafficInfo: toJsonInput(trafficInfo),
-        weatherInfo: toJsonInput(weatherInfo),
+        trafficInfo: trafficInfo ?? null,
+        weatherInfo: weatherInfo ?? null,
         isRecurring: body.isRecurring || false,
         recurrenceRule: body.recurrenceRule || null,
-        recurrenceEnd: body.recurrenceEnd ? new Date(body.recurrenceEnd) : null,
+        recurrenceEnd: body.recurrenceEnd ? new Date(body.recurrenceEnd).toISOString() : null,
         status: ReminderStatus.PENDING,
-      },
-    });
+        createdAt: now,
+        updatedAt: now,
+      })
+      .select()
+      .single();
+
+    if (createError || !reminder) {
+      console.error('[POST /reminders] Erreur Supabase:', createError);
+      return NextResponse.json(
+        { error: 'Erreur lors de la création du rappel', details: createError?.message },
+        { status: 500 }
+      );
+    }
 
     logger.info("Rappel créé", {
       userId: user.id,
@@ -165,31 +184,40 @@ export async function GET(request: NextRequest) {
     user = await requireUser();
     const params = request.nextUrl.searchParams;
 
-    const where: any = { userId: user.id };
+    // Construire la requête Supabase avec filtres
+    let query = supabase
+      .from('Reminder')
+      .select(`
+        *,
+        calendarEvent:CalendarEvent(
+          id,
+          title,
+          start,
+          location
+        )
+      `)
+      .eq('userId', user.id);
 
     // Filtres optionnels
     if (params.get("status")) {
-      where.status = params.get("status");
+      query = query.eq('status', params.get("status"));
     }
 
     if (params.get("calendarEventId")) {
-      where.calendarEventId = params.get("calendarEventId");
+      query = query.eq('calendarEventId', params.get("calendarEventId"));
     }
 
-    const reminders = await prisma.reminder.findMany({
-      where,
-      include: {
-        calendarEvent: {
-          select: {
-            id: true,
-            title: true,
-            start: true,
-            location: true,
-          },
-        },
-      },
-      orderBy: { scheduledFor: "asc" },
-    });
+    query = query.order('scheduledFor', { ascending: true });
+
+    const { data: reminders, error } = await query;
+
+    if (error) {
+      console.error('[GET /reminders] Erreur Supabase:', error);
+      return NextResponse.json(
+        { error: 'Erreur lors de la récupération des rappels', details: error.message },
+        { status: 500 }
+      );
+    }
 
     logger.debug("Rappels récupérés", {
       userId: user.id,

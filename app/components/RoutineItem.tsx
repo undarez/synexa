@@ -4,8 +4,7 @@ import { format } from "date-fns";
 import { Play, Pencil, Trash2, Power, PowerOff } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { RoutineTriggerType } from "@prisma/client";
-import type { Routine } from "@prisma/client";
+import { RoutineTriggerType, type Routine } from "@/app/lib/supabase/types";
 
 interface RoutineItemProps {
   routine: Routine & {

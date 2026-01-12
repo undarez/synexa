@@ -3,7 +3,7 @@
  * Collecte les données d'utilisation pour l'apprentissage automatique
  */
 
-import prisma from "@/app/lib/prisma";
+import { supabase } from "@/app/lib/supabase/client";
 
 export type ActivityType =
   | "task_created"
@@ -51,15 +51,18 @@ export async function trackActivity(
       timestamp: now.toISOString(),
     };
 
-    await prisma.userActivity.create({
-      data: {
+    const nowISO = now.toISOString();
+    await supabase
+      .from('UserActivity')
+      .insert({
         userId,
         activityType,
-        entityType,
-        entityId,
-        metadata: enrichedMetadata as any,
-      },
-    });
+        entityType: entityType || null,
+        entityId: entityId || null,
+        metadata: enrichedMetadata || null,
+        createdAt: nowISO,
+        updatedAt: nowISO,
+      });
   } catch (error) {
     // Ne pas bloquer l'application si le tracking échoue
     console.error("[Learning Tracker] Erreur lors du tracking:", error);
@@ -82,31 +85,31 @@ export async function analyzeRecentPatterns(
   const since = new Date();
   since.setDate(since.getDate() - days);
 
-  const activities = await prisma.userActivity.findMany({
-    where: {
-      userId,
-      createdAt: { gte: since },
-    },
-    select: {
-      activityType: true,
-      metadata: true,
-      createdAt: true,
-    },
-  });
+  const { data: activities, error } = await supabase
+    .from('UserActivity')
+    .select('activityType, metadata, createdAt')
+    .eq('userId', userId)
+    .gte('createdAt', since.toISOString());
+
+  if (error) {
+    console.error("[Learning Tracker] Erreur récupération activités:", error);
+  }
 
   // Analyser les heures les plus actives
   const hourCounts: Record<number, number> = {};
   const dayCounts: Record<number, number> = {};
   const contextCounts: Record<string, number> = {};
+
   let totalTaskDuration = 0;
   let taskCount = 0;
   let completedTasks = 0;
   let createdTasks = 0;
 
-  activities.forEach((activity: { activityType: string; metadata: any; createdAt: Date }) => {
-    const metadata = activity.metadata as ActivityMetadata;
-    const hour = metadata.hour ?? new Date(activity.createdAt).getHours();
-    const day = metadata.dayOfWeek ?? new Date(activity.createdAt).getDay();
+  (activities || []).forEach((activity: any) => {
+    const metadata = (activity.metadata || {}) as ActivityMetadata;
+    const createdAt = typeof activity.createdAt === 'string' ? new Date(activity.createdAt) : activity.createdAt;
+    const hour = metadata.hour ?? createdAt.getHours();
+    const day = metadata.dayOfWeek ?? createdAt.getDay();
 
     hourCounts[hour] = (hourCounts[hour] || 0) + 1;
     dayCounts[day] = (dayCounts[day] || 0) + 1;
@@ -167,25 +170,21 @@ export async function getRecentActivities(
   const since = new Date();
   since.setDate(since.getDate() - days);
 
-  const activities = await prisma.userActivity.findMany({
-    where: {
-      userId,
-      createdAt: { gte: since },
-    },
-    select: {
-      activityType: true,
-      metadata: true,
-      createdAt: true,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+  const { data: activities, error } = await supabase
+    .from('UserActivity')
+    .select('activityType, metadata, createdAt')
+    .eq('userId', userId)
+    .gte('createdAt', since.toISOString())
+    .order('createdAt', { ascending: false });
 
-  return activities.map((a: { activityType: string; metadata: any; createdAt: Date }) => ({
+  if (error) {
+    console.error("[Learning Tracker] Erreur récupération activités récentes:", error);
+  }
+
+  return (activities || []).map((a: any) => ({
     activityType: a.activityType as ActivityType,
-    createdAt: a.createdAt,
-    metadata: a.metadata as ActivityMetadata,
+    createdAt: typeof a.createdAt === 'string' ? new Date(a.createdAt) : a.createdAt,
+    metadata: (a.metadata || {}) as ActivityMetadata,
   }));
 }
 

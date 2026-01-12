@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
-import prisma from "@/app/lib/prisma";
+import { requireUser } from "@/app/lib/auth/mock";
+import { supabase } from "@/app/lib/supabase/client";
 
 /**
  * GET - Récupère les cotations favorites de l'utilisateur
@@ -9,24 +9,18 @@ export async function GET() {
   try {
     const user = await requireUser();
     
-    // Vérifier si la table existe, sinon retourner un tableau vide
-    try {
-      const favorites = await prisma.favoriteStock.findMany({
-        where: { userId: user.id },
-        orderBy: { createdAt: "desc" },
-      });
+    const { data: favorites, error } = await supabase
+      .from('FavoriteStock')
+      .select('*')
+      .eq('userId', user.id)
+      .order('createdAt', { ascending: false });
 
-      return NextResponse.json({ favorites });
-    } catch (dbError: any) {
-      // Si la table n'existe pas encore, retourner un tableau vide
-      if (dbError.message?.includes("does not exist") || 
-          dbError.message?.includes("no such table") ||
-          dbError.message?.includes("Cannot read properties of undefined")) {
-        console.warn("[GET /api/favorites/stocks] Table FavoriteStock n'existe pas encore, retour vide");
-        return NextResponse.json({ favorites: [] });
-      }
-      throw dbError;
+    if (error) {
+      console.error('[GET /api/favorites/stocks] Erreur Supabase:', error);
+      return NextResponse.json({ favorites: [] });
     }
+
+    return NextResponse.json({ favorites: favorites || [] });
   } catch (error) {
     console.error("[GET /api/favorites/stocks]", error);
     // En cas d'erreur, retourner un tableau vide plutôt qu'une erreur 500
@@ -50,45 +44,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    try {
-      const favorite = await prisma.favoriteStock.upsert({
-        where: {
-          userId_symbol: {
-            userId: user.id,
-            symbol: symbol,
-          },
-        },
-        update: {
-          name,
-          exchange: exchange || null,
-          currency: currency || null,
-          metadata: metadata || null,
-          updatedAt: new Date(),
-        },
-        create: {
-          userId: user.id,
-          symbol,
-          name,
-          exchange: exchange || null,
-          currency: currency || null,
-          metadata: metadata || null,
-        },
-      });
+    const now = new Date().toISOString();
+    
+    const { data: favorite, error } = await supabase
+      .from('FavoriteStock')
+      // @ts-expect-error - Le type Database.Update est any, mais TypeScript ne l'infère pas correctement
+      .upsert({
+        userId: user.id,
+        symbol,
+        name,
+        exchange: exchange || null,
+        currency: currency || null,
+        metadata: metadata || null,
+        updatedAt: now,
+      }, {
+        onConflict: 'userId,symbol',
+      })
+      .select()
+      .single();
 
-      return NextResponse.json({ favorite, added: true });
-    } catch (dbError: any) {
-      // Si la table n'existe pas encore, informer l'utilisateur
-      if (dbError.message?.includes("does not exist") || 
-          dbError.message?.includes("no such table") ||
-          dbError.message?.includes("Cannot read properties of undefined")) {
-        console.warn("[POST /api/favorites/stocks] Table FavoriteStock n'existe pas encore");
-        return NextResponse.json(
-          { error: "La fonctionnalité de favoris n'est pas encore disponible. Veuillez redémarrer le serveur après la migration de la base de données." },
-          { status: 503 }
-        );
-      }
-      throw dbError;
+    if (error) {
+      console.error('[POST /api/favorites/stocks] Erreur Supabase:', error);
+      return NextResponse.json(
+        { error: 'Erreur lors de l\'ajout du favori', details: error.message },
+        { status: 500 }
+      );
     }
+
+    return NextResponse.json({ favorite, added: true });
   } catch (error) {
     console.error("[POST /api/favorites/stocks]", error);
     return NextResponse.json(
@@ -114,26 +97,19 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    try {
-      await prisma.favoriteStock.delete({
-        where: {
-          userId_symbol: {
-            userId: user.id,
-            symbol: symbol,
-          },
-        },
-      });
+    const { error } = await supabase
+      .from('FavoriteStock')
+      .delete()
+      .eq('userId', user.id)
+      .eq('symbol', symbol);
 
+    if (error) {
+      console.error('[DELETE /api/favorites/stocks] Erreur Supabase:', error);
+      // Considérer comme déjà supprimé en cas d'erreur
       return NextResponse.json({ deleted: true });
-    } catch (dbError: any) {
-      // Si la table n'existe pas encore, considérer comme déjà supprimé
-      if (dbError.message?.includes("does not exist") || 
-          dbError.message?.includes("no such table") ||
-          dbError.message?.includes("Cannot read properties of undefined")) {
-        return NextResponse.json({ deleted: true });
-      }
-      throw dbError;
     }
+
+    return NextResponse.json({ deleted: true });
   } catch (error) {
     console.error("[DELETE /api/favorites/stocks]", error);
     return NextResponse.json(

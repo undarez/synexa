@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
+import { requireUser, UnauthorizedError } from "@/app/lib/auth/mock";
 import { detectPatterns } from "@/app/lib/learning/patterns";
 import { analyzeRecentPatterns } from "@/app/lib/learning/tracker";
-import prisma from "@/app/lib/prisma";
+import { supabase } from "@/app/lib/supabase/client";
 
 /**
  * GET /api/learning/patterns
@@ -15,10 +15,16 @@ export async function GET(request: NextRequest) {
     const days = parseInt(searchParams.get("days") || "30");
 
     // Récupérer les patterns appris
-    const learnedPatterns = await prisma.userLearning.findMany({
-      where: { userId: user.id },
-      orderBy: [{ confidence: "desc" }, { frequency: "desc" }],
-    });
+    const { data: learnedPatterns, error: fetchError } = await supabase
+      .from('UserLearning')
+      .select('*')
+      .eq('userId', user.id)
+      .order('confidence', { ascending: false })
+      .order('frequency', { ascending: false });
+
+    if (fetchError) {
+      console.error('[GET /api/learning/patterns] Erreur Supabase:', fetchError);
+    }
 
     // Analyser les patterns récents
     const recentPatterns = await analyzeRecentPatterns(user.id, days);
@@ -28,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      learned: learnedPatterns,
+      learned: learnedPatterns || [],
       recent: recentPatterns,
       detected: detectedPatterns,
     });

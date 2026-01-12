@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/app/lib/auth/admin";
-import prisma from "@/app/lib/prisma";
-import { Prisma } from "@prisma/client";
+import { supabase } from "@/app/lib/supabase/client";
 
 /**
  * GET - Récupère les logs de sécurité (admin uniquement)
@@ -10,30 +9,22 @@ export async function GET() {
   try {
     await requireAdmin();
 
-    const logs = await prisma.securityLog.findMany({
-      orderBy: {
-        createdAt: "desc",
-      },
-      take: 100, // Limiter à 100 derniers logs
-      select: {
-        id: true,
-        eventType: true,
-        severity: true,
-        details: true,
-        createdAt: true,
-        userId: true,
-      },
-    });
+    const { data: logs, error } = await supabase
+      .from('SecurityLog')
+      .select('id, eventType, severity, details, createdAt, userId')
+      .order('createdAt', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      console.error('[GET /admin/security-logs] Erreur:', error);
+      return NextResponse.json(
+        { error: 'Erreur lors de la récupération des logs', details: error.message },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
-      logs: logs.map((log: {
-        id: string;
-        eventType: string;
-        severity: string;
-        details: Prisma.JsonValue;
-        createdAt: Date;
-        userId: string | null;
-      }) => ({
+      logs: (logs || []).map((log: any) => ({
         ...log,
         timestamp: log.createdAt,
       })),

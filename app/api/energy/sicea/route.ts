@@ -4,41 +4,72 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
-import prisma from "@/app/lib/prisma";
-import { encryptSiceaData, decryptSiceaData } from "@/app/lib/encryption/sicea-encryption";
+import { requireUser } from "@/app/lib/auth/mock";
+import { supabase } from "@/app/lib/supabase/client";
+import { encryptSiceaData } from "@/app/lib/encryption/sicea-encryption";
 import { verifyTotpToken } from "@/app/lib/auth/totp";
 import { testSiceaConnection } from "@/app/lib/services/sicea-scraper";
 import { logSecurityEvent, generateDeviceId } from "@/app/lib/security/protection-layer";
 import { logger } from "@/app/lib/logger";
+import { generateId } from "@/app/lib/supabase/helpers";
+
+type TotpSecretData = {
+  id: string;
+  userId: string;
+  secret: string;
+  isEnabled: boolean;
+  lastUsedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
 
 /**
  * GET - Récupère les identifiants SICEA de l'utilisateur (sans les mots de passe)
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const user = await requireUser();
 
-    const credentials = await prisma.siceaCredentials.findUnique({
-      where: { userId: user.id },
-    });
+    const { data: credentials, error: fetchError } = await supabase
+      .from('SiceaCredentials')
+      .select('*')
+      .eq('userId', user.id)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      logger.error("Erreur récupération credentials SICEA", fetchError);
+    }
+
+    type CredentialsResponse = {
+      id: string;
+      contractNumber: string | null;
+      lastScrapedAt: string | null;
+      lastError: string | null;
+      isActive: boolean;
+      consentGiven: boolean;
+      consentDate: string | null;
+      createdAt: string | null;
+      updatedAt: string | null;
+    };
 
     if (!credentials) {
       return NextResponse.json({ credentials: null });
     }
 
+    const typedCredentials = credentials as CredentialsResponse;
+
     // Ne jamais renvoyer les mots de passe en clair
     return NextResponse.json({
       credentials: {
-        id: credentials.id,
-        contractNumber: credentials.contractNumber ? "***" : null, // Masquer
-        lastScrapedAt: credentials.lastScrapedAt,
-        lastError: credentials.lastError,
-        isActive: credentials.isActive,
-        consentGiven: credentials.consentGiven,
-        consentDate: credentials.consentDate,
-        createdAt: credentials.createdAt,
-        updatedAt: credentials.updatedAt,
+        id: typedCredentials.id,
+        contractNumber: typedCredentials.contractNumber ? "***" : null, // Masquer
+        lastScrapedAt: typedCredentials.lastScrapedAt,
+        lastError: typedCredentials.lastError,
+        isActive: typedCredentials.isActive,
+        consentGiven: typedCredentials.consentGiven,
+        consentDate: typedCredentials.consentDate,
+        createdAt: typedCredentials.createdAt,
+        updatedAt: typedCredentials.updatedAt,
       },
     });
   } catch (error) {
@@ -93,11 +124,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Récupérer le secret TOTP de l'utilisateur
-    const totpSecret = await prisma.totpSecret.findUnique({
-      where: { userId: user.id },
-    });
+    const { data: totpSecret, error: totpError } = await supabase
+      .from('TotpSecret')
+      .select('*')
+      .eq('userId', user.id)
+      .single();
 
-    if (!totpSecret || !totpSecret.isEnabled) {
+    if (totpError && totpError.code !== 'PGRST116') {
+      logger.error("Erreur récupération secret TOTP", totpError);
+    }
+
+    const typedTotpSecret = totpSecret as TotpSecretData | null;
+
+    if (!typedTotpSecret || !typedTotpSecret.isEnabled) {
       return NextResponse.json(
         {
           error: "La double authentification TOTP doit être activée pour configurer SICEA",
@@ -108,7 +147,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Vérifier le code TOTP
-    const isValidTotp = verifyTotpToken(totpSecret.secret, body.totpCode);
+    const isValidTotp = verifyTotpToken(typedTotpSecret.secret, body.totpCode);
     if (!isValidTotp) {
       await logSecurityEvent(
         user.id,
@@ -145,28 +184,58 @@ export async function POST(request: NextRequest) {
       contractNumber: prm, // PRM stocké dans contractNumber
     });
 
+    const now = new Date().toISOString();
+    
+    // Vérifier si des credentials existent déjà pour cet utilisateur
+    type ExistingCredentials = { id: string };
+    const { data: existingCredentials } = await supabase
+      .from('SiceaCredentials')
+      .select('id')
+      .eq('userId', user.id)
+      .single();
+    
+    // Générer un ID si nécessaire
+    const typedExistingCredentials = existingCredentials as ExistingCredentials | null;
+    const credentialsId = typedExistingCredentials?.id || generateId();
+    
     // Sauvegarder ou mettre à jour les credentials
-    const credentials = await prisma.siceaCredentials.upsert({
-      where: { userId: user.id },
-      update: {
-        username: encryptedData.username || undefined,
-        password: encryptedData.password || undefined,
+    // @ts-ignore - Supabase infère 'never' mais les données sont valides
+    const { data: credentials, error: upsertError } = await supabase
+      .from('SiceaCredentials')
+      .upsert({
+        id: credentialsId,
+        userId: user.id,
+        username: encryptedData.username || null,
+        password: encryptedData.password || null,
         contractNumber: encryptedData.contractNumber || null,
         consentGiven: true,
-        consentDate: new Date(),
+        consentDate: now,
         isActive: true,
         lastError: null,
-      },
-      create: {
-        userId: user.id,
-        username: encryptedData.username!,
-        password: encryptedData.password!,
-        contractNumber: encryptedData.contractNumber || null,
-        consentGiven: true,
-        consentDate: new Date(),
-        isActive: true,
-      },
-    });
+        updatedAt: now,
+      } as any, {
+        onConflict: 'userId',
+      })
+      .select()
+      .single();
+
+    if (upsertError || !credentials) {
+      logger.error("Erreur upsert credentials SICEA", upsertError);
+      return NextResponse.json(
+        { error: 'Erreur lors de la sauvegarde des credentials', details: upsertError?.message },
+        { status: 500 }
+      );
+    }
+
+    type CredentialsResponse = {
+      id: string;
+      contractNumber: string | null;
+      consentGiven: boolean;
+      consentDate: string | null;
+      createdAt: string | null;
+      updatedAt: string | null;
+    };
+    const typedCredentials = credentials as CredentialsResponse;
 
     // Enregistrer l'événement de sécurité
     await logSecurityEvent(
@@ -187,12 +256,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       credentials: {
-        id: credentials.id,
-        contractNumber: credentials.contractNumber ? "***" : null,
-        consentGiven: credentials.consentGiven,
-        consentDate: credentials.consentDate,
-        createdAt: credentials.createdAt,
-        updatedAt: credentials.updatedAt,
+        id: typedCredentials.id,
+        contractNumber: typedCredentials.contractNumber ? "***" : null,
+        consentGiven: typedCredentials.consentGiven,
+        consentDate: typedCredentials.consentDate,
+        createdAt: typedCredentials.createdAt,
+        updatedAt: typedCredentials.updatedAt,
       },
     });
   } catch (error) {
@@ -224,18 +293,26 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const totpSecret = await prisma.totpSecret.findUnique({
-      where: { userId: user.id },
-    });
+    const { data: totpSecret, error: totpError } = await supabase
+      .from('TotpSecret')
+      .select('*')
+      .eq('userId', user.id)
+      .single();
 
-    if (!totpSecret || !totpSecret.isEnabled) {
+    if (totpError && totpError.code !== 'PGRST116') {
+      logger.error("Erreur récupération secret TOTP", totpError);
+    }
+
+    const typedTotpSecretDelete = totpSecret as TotpSecretData | null;
+
+    if (!typedTotpSecretDelete || !typedTotpSecretDelete.isEnabled) {
       return NextResponse.json(
         { error: "La double authentification TOTP doit être activée" },
         { status: 400 }
       );
     }
 
-    const isValidTotp = verifyTotpToken(totpSecret.secret, body.totpCode);
+    const isValidTotp = verifyTotpToken(typedTotpSecretDelete.secret, body.totpCode);
     if (!isValidTotp) {
       return NextResponse.json(
         { error: "Code TOTP invalide" },
@@ -244,9 +321,18 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Supprimer les credentials
-    await prisma.siceaCredentials.delete({
-      where: { userId: user.id },
-    });
+    const { error: deleteError } = await supabase
+      .from('SiceaCredentials')
+      .delete()
+      .eq('userId', user.id);
+
+    if (deleteError) {
+      logger.error("Erreur suppression credentials SICEA", deleteError);
+      return NextResponse.json(
+        { error: 'Erreur lors de la suppression des credentials', details: deleteError.message },
+        { status: 500 }
+      );
+    }
 
     await logSecurityEvent(
       user.id,

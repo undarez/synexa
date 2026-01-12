@@ -3,7 +3,7 @@
 import { format } from "date-fns";
 import { Calendar, MapPin, Pencil, Trash2, Bell } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
-import type { CalendarEvent } from "@prisma/client";
+import type { CalendarEvent } from "@/app/lib/supabase/types";
 
 interface EventItemProps {
   event: CalendarEvent;

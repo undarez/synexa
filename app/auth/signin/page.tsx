@@ -1,41 +1,36 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useAuth } from "@/app/lib/auth/use-auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
-import AuthButtons from "@/app/components/auth/AuthButtons";
+import { SignInButton } from "@/app/components/auth/SignInButton";
+import { GoogleTokensDisplay } from "@/app/components/auth/GoogleTokensDisplay";
 
 export default function SignInPage() {
-  const { data: session, status } = useSession();
+  const { user, session, loading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    console.log("🔵 [SIGNIN] Statut de session:", status);
-    console.log("🔵 [SIGNIN] Session:", session);
-    
-    if (status === "authenticated") {
-      console.log("🔵 [SIGNIN] Utilisateur authentifié, redirection vers /dashboard");
-      // Utiliser replace au lieu de push pour éviter l'historique de navigation
-      router.replace("/dashboard");
-    } else if (status === "unauthenticated") {
-      // Vérifier s'il y a une erreur dans l'URL
-      const error = searchParams.get("error");
-      if (error) {
-        console.error("🔵 [SIGNIN] Erreur détectée:", error);
-        console.error("🔵 [SIGNIN] URL complète:", window.location.href);
-        console.error("🔵 [SIGNIN] Tous les paramètres:", Object.fromEntries(searchParams.entries()));
-        
-        // Afficher un message d'erreur plus détaillé
-        if (error === "Callback") {
-          console.error("🔵 [SIGNIN] Erreur Callback - Le callback OAuth a échoué");
-          console.error("🔵 [SIGNIN] Vérifiez les logs Vercel pour plus de détails");
-        }
-      }
+    // IMPORTANT: Ne jamais rediriger si loading === true
+    // Attendre que la session soit hydratée avant de prendre des décisions
+    if (loading) {
+      return;
     }
-  }, [status, session, router, searchParams]);
 
-  if (status === "loading") {
+    // Si l'utilisateur est connecté ET qu'on a une session valide, rediriger vers le dashboard
+    // Ne pas rediriger si user === null au premier render - attendre loading === false
+    if (user && session) {
+      const redirectTo = searchParams.get("redirect_to") || "/dashboard";
+      router.replace(redirectTo);
+    }
+  }, [user, session, loading, router, searchParams]);
+
+  // Afficher les erreurs éventuelles
+  const error = searchParams.get("error");
+  const errorMessage = searchParams.get("message");
+
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <p className="text-zinc-600 dark:text-zinc-400">Chargement...</p>
@@ -51,10 +46,24 @@ export default function SignInPage() {
         </h1>
         
         <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
-          Connectez-vous pour accéder à votre assistant personnel
+          Connectez-vous avec Google pour accéder à votre assistant personnel
         </p>
 
-        <AuthButtons />
+        {error && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200">
+            <p className="font-medium">Erreur d'authentification</p>
+            <p className="mt-1">{errorMessage || error}</p>
+          </div>
+        )}
+
+        <SignInButton />
+
+        {/* Affichage des tokens Google (mode développement uniquement) */}
+        <GoogleTokensDisplay />
+
+        <p className="mt-4 text-center text-xs text-zinc-500 dark:text-zinc-400">
+          En vous connectant, vous acceptez nos conditions d'utilisation et notre politique de confidentialité.
+        </p>
       </div>
     </div>
   );

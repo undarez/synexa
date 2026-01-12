@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
+import { requireUser } from "@/app/lib/auth/mock";
 import { exchangeCodeForTokens } from "@/app/lib/calendar/google";
-import prisma from "@/app/lib/prisma";
+// TODO: Implémenter la sauvegarde des tokens Google avec Supabase Auth
 
 /**
  * GET - Callback OAuth Google Calendar
@@ -38,41 +38,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Vérifier si l'utilisateur a déjà un compte Google
-    const existingAccount = await prisma.account.findFirst({
-      where: {
-        userId: user.id,
-        provider: "google",
-      },
-    });
-
-    if (existingAccount) {
-      // Mettre à jour le compte existant avec les nouveaux tokens
-      await prisma.account.update({
-        where: { id: existingAccount.id },
-        data: {
-          access_token: tokens.accessToken,
-          refresh_token: tokens.refreshToken,
-          expires_at: tokens.expiryDate ? Math.floor(tokens.expiryDate / 1000) : null,
-          scope: "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events",
-        },
-      });
-    } else {
-      // Créer un nouveau compte Google
-      await prisma.account.create({
-        data: {
-          userId: user.id,
-          type: "oauth",
-          provider: "google",
-          providerAccountId: user.email || `google_${user.id}`, // Utiliser l'email comme ID si disponible
-          access_token: tokens.accessToken,
-          refresh_token: tokens.refreshToken,
-          expires_at: tokens.expiryDate ? Math.floor(tokens.expiryDate / 1000) : null,
-          scope: "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events",
-          token_type: "Bearer",
-        },
-      });
-    }
+    // TODO: Implémenter la sauvegarde des tokens Google avec Supabase Auth
+    // Pour l'instant, on redirige avec succès mais les tokens ne sont pas sauvegardés
+    // Une fois Supabase Auth implémenté, utiliser auth.users.update() ou une table dédiée
+    console.log('[Google Calendar Callback] Tokens reçus pour user:', user.id);
+    console.log('[Google Calendar Callback] Access Token:', tokens.accessToken ? 'présent' : 'absent');
+    console.log('[Google Calendar Callback] Refresh Token:', tokens.refreshToken ? 'présent' : 'absent');
+    console.log('[Google Calendar Callback] TODO: Sauvegarder les tokens avec Supabase Auth');
 
     return NextResponse.redirect(
       `${baseUrl}/profile?success=google_calendar_connected&message=${encodeURIComponent("Google Calendar connecté avec succès")}`

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/app/lib/prisma";
-import { ReminderStatus } from "@prisma/client";
+import { supabase } from "@/app/lib/supabase/client";
+import { ReminderStatus } from "@/app/lib/supabase/types";
 import { sendReminderNotification } from "@/app/lib/reminders/notifications";
 import {
   calculateNextRecurrence,
@@ -29,24 +29,39 @@ export async function POST(request: NextRequest) {
     });
 
     // Récupérer tous les rappels en attente qui doivent être envoyés
-    const pendingReminders = await prisma.reminder.findMany({
-      where: {
-        status: ReminderStatus.PENDING,
-        scheduledFor: {
-          lte: now, // scheduledFor <= now
-        },
-      },
-      include: {
-        user: true,
-        calendarEvent: true,
-      },
-    });
+    const { data: pendingReminders, error: fetchError } = await supabase
+      .from('Reminder')
+      .select(`
+        *,
+        user:User(*),
+        calendarEvent:CalendarEvent(*)
+      `)
+      .eq('status', ReminderStatus.PENDING)
+      .lte('scheduledFor', now.toISOString());
+
+    if (fetchError) {
+      logger.error("Erreur récupération rappels", fetchError);
+    }
 
     const results = [];
 
-    for (const reminder of pendingReminders) {
+    for (const reminder of (pendingReminders || [])) {
       try {
         const result = await sendReminderNotification(reminder.id);
+        
+        // Mettre à jour le statut du rappel après envoi
+        const scheduledForDate = typeof reminder.scheduledFor === 'string' 
+          ? new Date(reminder.scheduledFor) 
+          : reminder.scheduledFor;
+        
+        await supabase
+          .from('Reminder')
+          .update({
+            status: result.success ? ReminderStatus.SENT : ReminderStatus.FAILED,
+            sentAt: result.success ? new Date().toISOString() : null,
+            updatedAt: new Date().toISOString(),
+          })
+          .eq('id', reminder.id);
         
         // Si le rappel est récurrent, créer la prochaine occurrence
         if (reminder.isRecurring && reminder.recurrenceRule && result.success) {
@@ -54,29 +69,33 @@ export async function POST(request: NextRequest) {
             const rule = parseRecurrenceRule(reminder.recurrenceRule);
             if (rule) {
               const nextDate = calculateNextRecurrence(
-                reminder.scheduledFor,
+                scheduledForDate,
                 rule
               );
 
               // Vérifier la date de fin de récurrence
-              if (nextDate && (!reminder.recurrenceEnd || nextDate <= reminder.recurrenceEnd)) {
-                await prisma.reminder.create({
-                  data: {
+              const recurrenceEnd = reminder.recurrenceEnd ? new Date(reminder.recurrenceEnd) : null;
+              if (nextDate && (!recurrenceEnd || nextDate <= recurrenceEnd)) {
+                const now = new Date().toISOString();
+                await supabase
+                  .from('Reminder')
+                  .insert({
                     userId: reminder.userId,
-                    calendarEventId: reminder.calendarEventId,
+                    calendarEventId: reminder.calendarEventId || null,
                     title: reminder.title,
-                    message: reminder.message,
+                    message: reminder.message || null,
                     reminderType: reminder.reminderType,
-                    scheduledFor: nextDate,
+                    scheduledFor: nextDate.toISOString(),
                     includeTraffic: reminder.includeTraffic,
                     includeWeather: reminder.includeWeather,
                     isRecurring: true,
-                    recurrenceRule: reminder.recurrenceRule,
-                    recurrenceEnd: reminder.recurrenceEnd,
+                    recurrenceRule: reminder.recurrenceRule || null,
+                    recurrenceEnd: recurrenceEnd ? recurrenceEnd.toISOString() : null,
                     parentReminderId: reminder.parentReminderId || reminder.id,
                     status: ReminderStatus.PENDING,
-                  },
-                });
+                    createdAt: now,
+                    updatedAt: now,
+                  });
               }
             }
           } catch (recurrenceError) {

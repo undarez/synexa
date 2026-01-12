@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
+import { requireUser } from "@/app/lib/auth/mock";
 import { getHueLights, createHueUser } from "@/app/lib/domotique/hue";
-import prisma from "@/app/lib/prisma";
 
 /**
  * GET - Récupère les lumières Hue d'un pont

@@ -3,8 +3,8 @@
  * Identifie les habitudes de l'utilisateur pour améliorer les suggestions
  */
 
-import prisma from "@/app/lib/prisma";
-import { Task, Routine, RoutineLog, UserActivity } from "@prisma/client";
+import { supabase } from "@/app/lib/supabase/client";
+import type { Task, Routine, RoutineLog, UserActivity } from "@/app/lib/supabase/types";
 import { analyzeRecentPatterns } from "./tracker";
 
 export interface DetectedPattern {
@@ -88,19 +88,21 @@ async function detectRecurringTasks(userId: string): Promise<DetectedPattern[]> 
   const patterns: DetectedPattern[] = [];
 
   // Tâches créées régulièrement avec le même titre ou contexte
-  const tasks = await prisma.task.findMany({
-    where: {
-      userId,
-      createdAt: {
-        gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 derniers jours
-      },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const { data: tasks, error: tasksError } = await supabase
+    .from('Task')
+    .select('*')
+    .eq('userId', userId)
+    .gte('createdAt', thirtyDaysAgo.toISOString())
+    .order('createdAt', { ascending: false });
+
+  if (tasksError) {
+    console.error("[Patterns] Erreur récupération tâches:", tasksError);
+  }
 
   // Grouper par titre similaire
-  const titleGroups: Record<string, typeof tasks> = {};
-  tasks.forEach((task: Task) => {
+  const titleGroups: Record<string, Task[]> = {};
+  (tasks || []).forEach((task: any) => {
     const normalizedTitle = task.title.toLowerCase().trim();
     if (!titleGroups[normalizedTitle]) {
       titleGroups[normalizedTitle] = [];
@@ -137,23 +139,28 @@ async function detectRecurringTasks(userId: string): Promise<DetectedPattern[]> 
 async function detectFrequentRoutines(userId: string): Promise<DetectedPattern[]> {
   const patterns: DetectedPattern[] = [];
 
-  const routines = await prisma.routine.findMany({
-    where: {
-      userId,
-      active: true,
-    },
-    include: {
-      logs: {
-        orderBy: { executedAt: "desc" },
-        take: 10,
-      },
-    },
-  });
+  const { data: routines, error: routinesError } = await supabase
+    .from('Routine')
+    .select(`
+      *,
+      logs:RoutineLog(*)
+    `)
+    .eq('userId', userId)
+    .eq('active', true)
+    .order('executedAt', { foreignTable: 'logs', ascending: false });
 
-  routines.forEach((routine: Routine & { logs: RoutineLog[] }) => {
-    if (routine.logs.length >= 3) {
+  if (routinesError) {
+    console.error("[Patterns] Erreur récupération routines:", routinesError);
+  }
+
+  (routines || []).forEach((routine: any) => {
+    const logs = (routine.logs || []).slice(0, 10) as RoutineLog[];
+    if (logs.length >= 3) {
       // Analyser les heures d'exécution
-      const executionHours = routine.logs.map((log: RoutineLog) => new Date(log.executedAt).getHours());
+      const executionHours = logs.map((log: any) => {
+        const executedAt = typeof log.executedAt === 'string' ? new Date(log.executedAt) : log.executedAt;
+        return executedAt.getHours();
+      });
       const mostCommonHour = executionHours.reduce(
         (a: number, b: number, _: number, arr: number[]) => (arr.filter((v: number) => v === a).length >= arr.filter((v: number) => v === b).length ? a : b),
         executionHours[0]
@@ -162,12 +169,12 @@ async function detectFrequentRoutines(userId: string): Promise<DetectedPattern[]
       patterns.push({
         category: "routine",
         pattern: `frequent_routine:${routine.id}`,
-        frequency: routine.logs.length,
-        confidence: Math.min(0.9, 0.6 + routine.logs.length * 0.05),
+        frequency: logs.length,
+        confidence: Math.min(0.9, 0.6 + logs.length * 0.05),
         metadata: {
           routineId: routine.id,
           routineName: routine.name,
-          executionCount: routine.logs.length,
+          executionCount: logs.length,
           preferredHour: mostCommonHour,
           triggerType: routine.triggerType,
         },
@@ -184,20 +191,23 @@ async function detectFrequentRoutines(userId: string): Promise<DetectedPattern[]
 async function detectVoiceCommandPatterns(userId: string): Promise<DetectedPattern[]> {
   const patterns: DetectedPattern[] = [];
 
-  const voiceActivities = await prisma.userActivity.findMany({
-    where: {
-      userId,
-      activityType: "voice_command",
-      createdAt: {
-        gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-      },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const { data: voiceActivities, error: voiceError } = await supabase
+    .from('UserActivity')
+    .select('*')
+    .eq('userId', userId)
+    .eq('activityType', 'voice_command')
+    .gte('createdAt', thirtyDaysAgo.toISOString())
+    .order('createdAt', { ascending: false });
 
-  if (voiceActivities.length >= 5) {
+  if (voiceError) {
+    console.error("[Patterns] Erreur récupération commandes vocales:", voiceError);
+    return patterns; // Retourner les patterns déjà détectés
+  }
+
+  if ((voiceActivities || []).length >= 5) {
     // Analyser les heures d'utilisation
-    const hours = voiceActivities.map((a: UserActivity) => {
+    const hours = (voiceActivities || []).map((a: any) => {
       const metadata = a.metadata as any;
       return metadata?.hour ?? new Date(a.createdAt).getHours();
     });
@@ -238,29 +248,47 @@ export async function savePattern(
   confidence: number = 0.5
 ): Promise<void> {
   try {
-    await prisma.userLearning.upsert({
-      where: {
-        userId_category_pattern: {
+    const now = new Date().toISOString();
+    
+    // Récupérer le pattern existant pour incrémenter la fréquence
+    const { data: existingPattern } = await supabase
+      .from('UserLearning')
+      .select('frequency, confidence')
+      .eq('userId', userId)
+      .eq('category', category)
+      .eq('pattern', pattern)
+      .single();
+
+    if (existingPattern) {
+      // Mettre à jour le pattern existant
+      await supabase
+        .from('UserLearning')
+        .update({
+          frequency: (existingPattern.frequency || 0) + 1,
+          lastObserved: now,
+          confidence: Math.min(1, (existingPattern.confidence || 0.5) + 0.05),
+          metadata: metadata || null,
+          updatedAt: now,
+        })
+        .eq('userId', userId)
+        .eq('category', category)
+        .eq('pattern', pattern);
+    } else {
+      // Créer un nouveau pattern
+      await supabase
+        .from('UserLearning')
+        .insert({
           userId,
           category,
           pattern,
-        },
-      },
-      update: {
-        frequency: { increment: 1 },
-        lastObserved: new Date(),
-        confidence: Math.min(1, confidence + 0.05), // Augmenter la confiance à chaque observation
-        metadata: metadata as any,
-      },
-      create: {
-        userId,
-        category,
-        pattern,
-        frequency: 1,
-        confidence,
-        metadata: metadata as any,
-      },
-    });
+          frequency: 1,
+          confidence,
+          metadata: metadata || null,
+          lastObserved: now,
+          createdAt: now,
+          updatedAt: now,
+        });
+    }
   } catch (error) {
     console.error("[Learning Patterns] Erreur lors de la sauvegarde du pattern:", error);
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/app/lib/auth/mock-client";
 import { redirect } from "next/navigation";
 import { Navigation } from "@/app/components/Navigation";
 import { Footer } from "@/app/components/Footer";

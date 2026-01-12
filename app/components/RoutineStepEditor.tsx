@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/app/components/ui/select";
 import { Card, CardContent } from "@/app/components/ui/card";
-import { RoutineActionType } from "@prisma/client";
+import { RoutineActionType } from "@/app/lib/supabase/types";
 
 export interface RoutineStep {
   id?: string;

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
+import { requireUser } from "@/app/lib/auth/mock";
 import { getMonthlyIncome } from "@/app/lib/finance/income";
 import { getMonthlyExpenses } from "@/app/lib/finance/expenses";
 

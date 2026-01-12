@@ -22,9 +22,9 @@ import {
   DialogTitle,
 } from "@/app/components/ui/dialog";
 import { NaturalLanguageInput } from "@/app/components/NaturalLanguageInput";
-import { CalendarSource } from "@prisma/client";
-import type { CalendarEvent } from "@prisma/client";
+import { CalendarSource, type CalendarEvent } from "@/app/lib/supabase/types";
 import type { ParsedEvent } from "@/app/lib/ai/event-parser";
+import { useAuth } from "@/app/lib/auth/use-auth";
 
 interface EventFormProps {
   event?: CalendarEvent | null;
@@ -34,6 +34,7 @@ interface EventFormProps {
 }
 
 export function EventForm({ event, open, onOpenChange, onSuccess }: EventFormProps) {
+  const { session } = useAuth();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
@@ -52,16 +53,34 @@ export function EventForm({ event, open, onOpenChange, onSuccess }: EventFormPro
     // Vérifier si Google Calendar est connecté
     const checkGoogleConnection = async () => {
       try {
-        const response = await fetch("/api/calendar/sync");
+        // Si pas de session ou pas de provider_token, Google Calendar n'est pas connecté
+        if (!session?.provider_token) {
+          setGoogleConnected(false);
+          return;
+        }
+
+        // Vérifier que le token fonctionne avec Google Calendar API
+        const response = await fetch("/api/calendar/sync", {
+          headers: {
+            Authorization: `Bearer ${session.provider_token}`,
+          },
+        });
+
         if (response.ok) {
           const data = await response.json();
           setGoogleConnected(data.connected);
+        } else {
+          setGoogleConnected(false);
         }
       } catch (err) {
         console.error("Erreur vérification Google:", err);
+        setGoogleConnected(false);
       }
     };
-    checkGoogleConnection();
+
+    if (session !== undefined) {
+      checkGoogleConnection();
+    }
 
     if (event) {
       setTitle(event.title);

@@ -21,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/app/components/ui/dialog";
-import type { Bill, BillCategory } from "@prisma/client";
+import type { Bill, BillCategory } from "@/app/lib/supabase/types";
 import { 
   Zap, 
   Wifi, 

@@ -1,6 +1,6 @@
 "use client";
 
-import { signIn } from "next-auth/react";
+import { signIn } from "@/app/lib/auth/mock-client";
 import { useState } from "react";
 import { LoginModal } from "./LoginModal";
 import { RegisterModal } from "./RegisterModal";

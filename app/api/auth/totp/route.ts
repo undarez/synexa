@@ -3,8 +3,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
-import prisma from "@/app/lib/prisma";
+import { requireUser } from "@/app/lib/auth/mock";
+import { supabase } from "@/app/lib/supabase/client";
 import { generateTotpSecret, verifyTotpToken, generateTotpQRCode } from "@/app/lib/auth/totp";
 import { encrypt } from "@/app/lib/encryption";
 import { logSecurityEvent, generateDeviceId } from "@/app/lib/security/protection-layer";
@@ -17,11 +17,20 @@ export async function GET(request: NextRequest) {
   try {
     const user = await requireUser();
 
-    const totpSecret = await prisma.totpSecret.findUnique({
-      where: { userId: user.id },
-    });
+    type TotpSecretData = { isEnabled: boolean; lastUsedAt: string | null; secret: string; [key: string]: unknown };
+    const { data: totpSecret, error: totpError } = await supabase
+      .from('TotpSecret')
+      .select('*')
+      .eq('userId', user.id)
+      .single();
 
-    if (!totpSecret) {
+    if (totpError && totpError.code !== 'PGRST116') {
+      logger.error("Erreur récupération secret TOTP", totpError);
+    }
+
+    const typedTotpSecret = totpSecret as TotpSecretData | null;
+
+    if (!typedTotpSecret) {
       return NextResponse.json({
         isEnabled: false,
         hasSecret: false,
@@ -29,11 +38,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Si TOTP est activé, ne pas renvoyer le QR code (sécurité)
-    if (totpSecret.isEnabled) {
+    if (typedTotpSecret.isEnabled) {
       return NextResponse.json({
         isEnabled: true,
         hasSecret: true,
-        lastUsedAt: totpSecret.lastUsedAt,
+        lastUsedAt: typedTotpSecret.lastUsedAt,
       });
     }
 
@@ -73,19 +82,19 @@ export async function POST(request: NextRequest) {
         user.email || "user"
       );
 
+      const now = new Date().toISOString();
+      
       // Sauvegarder le secret chiffré (mais pas encore activé)
-      await prisma.totpSecret.upsert({
-        where: { userId: user.id },
-        update: {
-          secret: encryptedSecret,
-          isEnabled: false,
-        },
-        create: {
+      await supabase
+        .from('TotpSecret')
+        .upsert({
           userId: user.id,
           secret: encryptedSecret,
           isEnabled: false,
-        },
-      });
+          updatedAt: now,
+        } as any, {
+          onConflict: 'userId',
+        });
 
       // Générer le QR code
       const qrCodeDataUrl = await generateTotpQRCode(qrCodeUrl);
@@ -116,11 +125,20 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const totpSecret = await prisma.totpSecret.findUnique({
-        where: { userId: user.id },
-      });
+      type TotpSecretData = { isEnabled: boolean; secret: string; [key: string]: unknown };
+      const { data: totpSecret, error: totpFetchError } = await supabase
+        .from('TotpSecret')
+        .select('*')
+        .eq('userId', user.id)
+        .single();
 
-      if (!totpSecret || !totpSecret.secret) {
+      if (totpFetchError && totpFetchError.code !== 'PGRST116') {
+        logger.error("Erreur récupération secret TOTP", totpFetchError);
+      }
+
+      const typedTotpSecret = totpSecret as TotpSecretData | null;
+
+      if (!typedTotpSecret || !typedTotpSecret.secret) {
         return NextResponse.json(
           { error: "Aucun secret TOTP trouvé. Générez d'abord un secret." },
           { status: 400 }
@@ -128,7 +146,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Vérifier le code TOTP
-      const isValid = verifyTotpToken(totpSecret.secret, body.totpCode);
+      const isValid = verifyTotpToken(typedTotpSecret.secret, body.totpCode);
       if (!isValid) {
         await logSecurityEvent(
           user.id,
@@ -147,13 +165,17 @@ export async function POST(request: NextRequest) {
       }
 
       // Activer TOTP
-      await prisma.totpSecret.update({
-        where: { userId: user.id },
-        data: {
+      const now = new Date().toISOString();
+      // @ts-ignore - Supabase infère 'never' mais les données sont valides
+      await supabase
+        .from('TotpSecret')
+        // @ts-ignore
+        .update({
           isEnabled: true,
-          lastUsedAt: new Date(),
-        },
-      });
+          lastUsedAt: now,
+          updatedAt: now,
+        } as any)
+        .eq('userId', user.id);
 
       await logSecurityEvent(
         user.id,
@@ -201,11 +223,20 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const totpSecret = await prisma.totpSecret.findUnique({
-      where: { userId: user.id },
-    });
+    type TotpSecretData = { isEnabled: boolean; secret: string; [key: string]: unknown };
+    const { data: totpSecret, error: totpFetchError } = await supabase
+      .from('TotpSecret')
+      .select('*')
+      .eq('userId', user.id)
+      .single();
 
-    if (!totpSecret || !totpSecret.isEnabled) {
+    if (totpFetchError && totpFetchError.code !== 'PGRST116') {
+      logger.error("Erreur récupération secret TOTP", totpFetchError);
+    }
+
+    const typedTotpSecret = totpSecret as TotpSecretData | null;
+
+    if (!typedTotpSecret || !typedTotpSecret.isEnabled) {
       return NextResponse.json(
         { error: "TOTP n'est pas activé" },
         { status: 400 }
@@ -213,7 +244,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Vérifier le code TOTP
-    const isValid = verifyTotpToken(totpSecret.secret, body.totpCode);
+    const isValid = verifyTotpToken(typedTotpSecret.secret, body.totpCode);
     if (!isValid) {
       return NextResponse.json(
         { error: "Code TOTP invalide" },
@@ -222,12 +253,15 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Désactiver TOTP
-    await prisma.totpSecret.update({
-      where: { userId: user.id },
-      data: {
+    // @ts-ignore - Supabase infère 'never' mais les données sont valides
+    await supabase
+      .from('TotpSecret')
+      // @ts-ignore
+      .update({
         isEnabled: false,
-      },
-    });
+        updatedAt: new Date().toISOString(),
+      } as any)
+      .eq('userId', user.id);
 
     await logSecurityEvent(
       user.id,

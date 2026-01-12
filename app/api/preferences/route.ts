@@ -1,17 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
-import prisma from "@/app/lib/prisma";
-import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
-import { toJsonInput } from "@/app/lib/prisma/json";
+import { supabase } from "@/app/lib/supabase/client";
+import { requireUser, UnauthorizedError } from "@/app/lib/auth/mock";
 
 export async function GET() {
   try {
     const user = await requireUser();
-    const preferences = await prisma.preference.findMany({
-      where: { userId: user.id },
-      orderBy: { key: "asc" },
-    });
-    return NextResponse.json({ preferences });
+    
+    const { data: preferences, error } = await supabase
+      .from('Preference')
+      .select('*')
+      .eq('userId', user.id)
+      .order('key', { ascending: true });
+
+    if (error) {
+      console.error('[GET /preferences] Erreur Supabase:', error);
+      return NextResponse.json(
+        { error: 'Erreur lors de la récupération des préférences', details: error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ preferences: preferences || [] });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: error.message }, { status: 401 });
@@ -38,16 +47,33 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const operations = Object.entries(body.preferences).map(([key, value]) =>
-      prisma.preference.upsert({
-        where: { userId_key: { userId: user.id, key } },
-        update: { value: toJsonInput(value) ?? Prisma.JsonNull },
-        create: { userId: user.id, key, value: toJsonInput(value) ?? Prisma.JsonNull },
-      })
-    );
+    // Convertir les préférences en format Supabase (upsert)
+    const now = new Date().toISOString();
+    const preferencesToUpsert = Object.entries(body.preferences).map(([key, value]) => ({
+      userId: user.id,
+      key,
+      value: value ?? null, // Supabase gère JSON automatiquement
+      updatedAt: now,
+    }));
 
-    const updated = await prisma.$transaction(operations);
-    return NextResponse.json({ preferences: updated });
+    // Utiliser upsert avec onConflict pour gérer les mises à jour
+    const { data: updated, error } = await supabase
+      .from('Preference')
+      // @ts-expect-error - Le type Database.Update est any, mais TypeScript ne l'infère pas correctement
+      .upsert(preferencesToUpsert, {
+        onConflict: 'userId,key',
+      })
+      .select();
+
+    if (error) {
+      console.error('[PATCH /preferences] Erreur Supabase:', error);
+      return NextResponse.json(
+        { error: 'Erreur lors de la mise à jour des préférences', details: error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ preferences: updated || [] });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: error.message }, { status: 401 });

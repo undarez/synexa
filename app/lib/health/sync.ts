@@ -3,10 +3,10 @@
  * Synchronise avec Apple Health, Fitbit, Withings, etc.
  */
 
-import prisma from "@/app/lib/prisma";
-import { HealthMetricType, Prisma } from "@prisma/client";
+import { supabase } from "@/app/lib/supabase/client";
+import { HealthMetricType } from "@/app/lib/supabase/types";
 import { createHealthMetric } from "./metrics";
-import { toJsonInput } from "@/app/lib/prisma/json";
+import { toJsonInput } from "@/app/lib/supabase/helpers";
 
 export interface HealthSyncConfig {
   provider: "apple_health" | "fitbit" | "withings" | "google_fit";
@@ -25,16 +25,14 @@ export async function getHealthSyncConfig(
   userId: string,
   provider: "apple_health" | "fitbit" | "withings" | "google_fit"
 ): Promise<HealthSyncConfig | null> {
-  const preference = await prisma.preference.findUnique({
-    where: {
-      userId_key: {
-        userId,
-        key: `health_sync_${provider}`,
-      },
-    },
-  });
+  const { data: preference, error } = await supabase
+    .from('Preference')
+    .select('value')
+    .eq('userId', userId)
+    .eq('key', `health_sync_${provider}`)
+    .single();
 
-  if (!preference) return null;
+  if (error || !preference) return null;
 
   return preference.value as unknown as HealthSyncConfig;
 }
@@ -46,22 +44,23 @@ export async function setHealthSyncConfig(
   userId: string,
   config: HealthSyncConfig
 ): Promise<void> {
-  await prisma.preference.upsert({
-    where: {
-      userId_key: {
-        userId,
-        key: `health_sync_${config.provider}`,
-      },
-    },
-    create: {
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from('Preference')
+    // @ts-expect-error - Le type Database.Insert est any, mais TypeScript ne l'infère pas correctement
+    .upsert({
       userId,
       key: `health_sync_${config.provider}`,
-      value: toJsonInput(config) ?? Prisma.JsonNull,
-    },
-    update: {
-      value: toJsonInput(config) ?? Prisma.JsonNull,
-    },
-  });
+      value: toJsonInput(config) ?? null,
+      updatedAt: now,
+    }, {
+      onConflict: 'userId,key',
+    });
+
+  if (error) {
+    console.error('[Health Sync] Erreur lors de la sauvegarde de la config:', error);
+    throw new Error(`Erreur lors de la sauvegarde de la configuration: ${error.message}`);
+  }
 }
 
 /**

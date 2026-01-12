@@ -3,7 +3,7 @@
  * Analyse les préférences et activités de l'utilisateur pour suggérer des widgets pertinents
  */
 
-import prisma from "@/app/lib/prisma";
+import { supabase } from "@/app/lib/supabase/client";
 import { WidgetType, AVAILABLE_WIDGETS } from "./widgets";
 
 export interface WidgetSuggestion {
@@ -20,55 +20,63 @@ export async function getWidgetSuggestions(userId: string): Promise<WidgetSugges
 
   try {
     // Récupérer les widgets actuellement visibles
-    const currentWidgets = await prisma.dashboardWidget.findMany({
-      where: { userId, visible: true },
-      select: { widgetType: true },
-    });
+    const { data: currentWidgets } = await supabase
+      .from('DashboardWidget')
+      .select('widgetType')
+      .eq('userId', userId)
+      .eq('visible', true);
 
-    const visibleWidgetTypes = new Set(currentWidgets.map((w: { widgetType: string }) => w.widgetType as WidgetType));
+    const visibleWidgetTypes = new Set((currentWidgets || []).map((w: any) => w.widgetType as WidgetType));
 
     // Analyser les activités récentes
-    const recentActivities = await prisma.userActivity.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    });
+    const { data: recentActivities } = await supabase
+      .from('UserActivity')
+      .select('*')
+      .eq('userId', userId)
+      .order('createdAt', { ascending: false })
+      .limit(50);
 
     // Analyser les métriques de santé
-    const healthMetrics = await prisma.healthMetric.findMany({
-      where: { userId },
-      orderBy: { recordedAt: "desc" },
-      take: 10,
-    });
+    const { data: healthMetrics } = await supabase
+      .from('HealthMetric')
+      .select('*')
+      .eq('userId', userId)
+      .order('recordedAt', { ascending: false })
+      .limit(10);
 
     // Analyser les tâches
-    const tasks = await prisma.task.findMany({
-      where: { userId },
-      take: 20,
-    });
+    const { data: tasks } = await supabase
+      .from('Task')
+      .select('*')
+      .eq('userId', userId)
+      .limit(20);
 
     // Analyser les événements
-    const events = await prisma.calendarEvent.findMany({
-      where: { userId },
-      take: 20,
-    });
+    const { data: events } = await supabase
+      .from('CalendarEvent')
+      .select('*')
+      .eq('userId', userId)
+      .limit(20);
 
     // Analyser les routines
-    const routines = await prisma.routine.findMany({
-      where: { userId, active: true },
-    });
+    const { data: routines } = await supabase
+      .from('Routine')
+      .select('*')
+      .eq('userId', userId)
+      .eq('active', true);
 
     // Analyser les finances
-    const expenses = await prisma.expense.findMany({
-      where: { userId },
-      orderBy: { date: "desc" },
-      take: 10,
-    });
+    const { data: expenses } = await supabase
+      .from('Expense')
+      .select('*')
+      .eq('userId', userId)
+      .order('date', { ascending: false })
+      .limit(10);
 
     // Suggestions basées sur les activités
 
     // Si beaucoup d'événements mais widget non visible
-    if (events.length > 5 && !visibleWidgetTypes.has("events")) {
+    if ((events || []).length > 5 && !visibleWidgetTypes.has("events")) {
       suggestions.push({
         widgetType: "events",
         reason: "Vous avez plusieurs événements programmés. Le widget Événements pourrait vous être utile.",
@@ -77,7 +85,7 @@ export async function getWidgetSuggestions(userId: string): Promise<WidgetSugges
     }
 
     // Si beaucoup de tâches mais widget non visible
-    if (tasks.length > 3 && !visibleWidgetTypes.has("tasks")) {
+    if ((tasks || []).length > 3 && !visibleWidgetTypes.has("tasks")) {
       suggestions.push({
         widgetType: "tasks",
         reason: "Vous avez plusieurs tâches en cours. Le widget Tâches vous aiderait à les suivre.",
@@ -86,7 +94,7 @@ export async function getWidgetSuggestions(userId: string): Promise<WidgetSugges
     }
 
     // Si des métriques de santé mais widget non visible
-    if (healthMetrics.length > 0 && !visibleWidgetTypes.has("health")) {
+    if ((healthMetrics || []).length > 0 && !visibleWidgetTypes.has("health")) {
       suggestions.push({
         widgetType: "health",
         reason: "Vous suivez votre santé. Le widget Santé vous donnerait un aperçu rapide.",
@@ -95,7 +103,7 @@ export async function getWidgetSuggestions(userId: string): Promise<WidgetSugges
     }
 
     // Si des dépenses mais widget finance non visible
-    if (expenses.length > 0 && !visibleWidgetTypes.has("finance")) {
+    if ((expenses || []).length > 0 && !visibleWidgetTypes.has("finance")) {
       suggestions.push({
         widgetType: "finance",
         reason: "Vous suivez vos finances. Le widget Finance vous aiderait à mieux gérer votre budget.",
@@ -104,7 +112,7 @@ export async function getWidgetSuggestions(userId: string): Promise<WidgetSugges
     }
 
     // Si des routines actives mais widget non visible
-    if (routines.length > 0 && !visibleWidgetTypes.has("routines")) {
+    if ((routines || []).length > 0 && !visibleWidgetTypes.has("routines")) {
       suggestions.push({
         widgetType: "routines",
         reason: "Vous avez des automatisations actives. Le widget Automatisations vous permettrait de les surveiller.",
@@ -131,7 +139,7 @@ export async function getWidgetSuggestions(userId: string): Promise<WidgetSugges
     }
 
     // Suggestion bien-être si métriques de santé
-    if (healthMetrics.length > 5 && !visibleWidgetTypes.has("wellness")) {
+    if ((healthMetrics || []).length > 5 && !visibleWidgetTypes.has("wellness")) {
       suggestions.push({
         widgetType: "wellness",
         reason: "Vous suivez plusieurs métriques. Le widget Bien-être vous offre une vue d'ensemble.",

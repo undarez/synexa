@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
-import prisma from "@/app/lib/prisma";
+import { requireUser } from "@/app/lib/auth/mock";
+import { supabase } from "@/app/lib/supabase/client";
 import { encryptEnedisData, decryptEnedisData } from "@/app/lib/encryption/enedis-encryption";
 import { logger } from "@/app/lib/logger";
 
@@ -40,37 +40,46 @@ export async function POST(request: NextRequest) {
       refreshToken: body.refreshToken || null,
     });
 
+    const now = new Date().toISOString();
+    
     // Créer ou mettre à jour les credentials
-    const credentials = await prisma.enedisCredentials.upsert({
-      where: { userId: user.id },
-      update: {
-        meterSerialNumber: encryptedData.meterSerialNumber || undefined,
-        rpm: encryptedData.rpm || null,
-        linkyToken: encryptedData.linkyToken || null,
-        accessToken: encryptedData.accessToken || null,
-        refreshToken: encryptedData.refreshToken || null,
-        pdl: body.pdl || null,
-        consentGiven: true,
-        consentDate: new Date(),
-      },
-      create: {
+    const { data: credentials, error: upsertError } = await supabase
+      .from('EnedisCredentials')
+      // @ts-expect-error - Le type Database.Update est any, mais TypeScript ne l'infère pas correctement
+      .upsert({
         userId: user.id,
-        meterSerialNumber: encryptedData.meterSerialNumber!,
+        meterSerialNumber: encryptedData.meterSerialNumber || null,
         rpm: encryptedData.rpm || null,
         linkyToken: encryptedData.linkyToken || null,
         accessToken: encryptedData.accessToken || null,
         refreshToken: encryptedData.refreshToken || null,
         pdl: body.pdl || null,
         consentGiven: true,
-        consentDate: new Date(),
-      },
-    });
+        consentDate: now,
+        updatedAt: now,
+      }, {
+        onConflict: 'userId',
+      })
+      .select()
+      .single();
+
+    if (upsertError || !credentials) {
+      logger.error("Erreur upsert credentials Enedis", upsertError);
+      return NextResponse.json(
+        { error: 'Erreur lors de la sauvegarde des credentials', details: upsertError?.message },
+        { status: 500 }
+      );
+    }
 
     // Mettre à jour aussi dans le profil utilisateur (chiffré)
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { meterSerialNumber: encryptedData.meterSerialNumber || null },
-    });
+    await supabase
+      .from('User')
+      // @ts-ignore - Supabase infère 'never' mais les données sont valides
+      .update({
+        meterSerialNumber: encryptedData.meterSerialNumber || null,
+        updatedAt: now,
+      } as any)
+      .eq('id', user.id);
 
     logger.info("Credentials Enedis configurés avec consentement", {
       userId: user.id,
@@ -78,16 +87,19 @@ export async function POST(request: NextRequest) {
       consentDate: new Date().toISOString(),
     });
 
+    type CredentialsData = { id: string; pdl: string | null; consentGiven: boolean; consentDate: string | null; createdAt: string | null; updatedAt: string | null; [key: string]: unknown };
+    const typedCredentials = credentials as CredentialsData;
+
     // Retourner les données sans les valeurs sensibles (pour la sécurité)
     return NextResponse.json({
       success: true,
       credentials: {
-        id: credentials.id,
-        pdl: credentials.pdl,
-        consentGiven: credentials.consentGiven,
-        consentDate: credentials.consentDate,
-        createdAt: credentials.createdAt,
-        updatedAt: credentials.updatedAt,
+        id: typedCredentials.id,
+        pdl: typedCredentials.pdl,
+        consentGiven: typedCredentials.consentGiven,
+        consentDate: typedCredentials.consentDate,
+        createdAt: typedCredentials.createdAt,
+        updatedAt: typedCredentials.updatedAt,
       },
     });
   } catch (error) {
@@ -106,11 +118,28 @@ export async function GET() {
   try {
     const user = await requireUser();
 
-    const credentials = await prisma.enedisCredentials.findUnique({
-      where: { userId: user.id },
-    });
+    type EnedisCredentialsData = { 
+      meterSerialNumber: string | null; 
+      rpm: string | null; 
+      linkyToken: string | null; 
+      accessToken: string | null; 
+      refreshToken: string | null; 
+      [key: string]: unknown 
+    };
 
-    if (!credentials) {
+    const { data: credentials, error: fetchError } = await supabase
+      .from('EnedisCredentials')
+      .select('*')
+      .eq('userId', user.id)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      logger.error("Erreur récupération credentials Enedis", fetchError);
+    }
+
+    const typedCredentials = credentials as EnedisCredentialsData | null;
+
+    if (!typedCredentials) {
       return NextResponse.json({
         success: true,
         credentials: null,
@@ -119,27 +148,30 @@ export async function GET() {
 
     // Déchiffrer les données sensibles
     const decryptedData = decryptEnedisData({
-      meterSerialNumber: credentials.meterSerialNumber,
-      rpm: credentials.rpm,
-      linkyToken: credentials.linkyToken,
-      accessToken: credentials.accessToken,
-      refreshToken: credentials.refreshToken,
+      meterSerialNumber: typedCredentials.meterSerialNumber,
+      rpm: typedCredentials.rpm,
+      linkyToken: typedCredentials.linkyToken,
+      accessToken: typedCredentials.accessToken,
+      refreshToken: typedCredentials.refreshToken,
     });
+
+    type CredentialsResponseData = { id: string; pdl: string | null; consentGiven: boolean; consentDate: string | null; createdAt: string | null; updatedAt: string | null; [key: string]: unknown };
+    const typedCredentialsResponse = typedCredentials as unknown as CredentialsResponseData;
 
     // Retourner les données déchiffrées (uniquement pour l'utilisateur authentifié)
     return NextResponse.json({
       success: true,
       credentials: {
-        id: credentials.id,
+        id: typedCredentialsResponse.id,
         meterSerialNumber: decryptedData.meterSerialNumber,
         rpm: decryptedData.rpm,
         linkyToken: decryptedData.linkyToken ? "***" : null, // Ne pas exposer le token complet
         hasLinkyToken: !!decryptedData.linkyToken,
-        pdl: credentials.pdl,
-        consentGiven: credentials.consentGiven,
-        consentDate: credentials.consentDate,
-        createdAt: credentials.createdAt,
-        updatedAt: credentials.updatedAt,
+        pdl: typedCredentialsResponse.pdl,
+        consentGiven: typedCredentialsResponse.consentGiven,
+        consentDate: typedCredentialsResponse.consentDate,
+        createdAt: typedCredentialsResponse.createdAt,
+        updatedAt: typedCredentialsResponse.updatedAt,
       },
     });
   } catch (error) {

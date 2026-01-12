@@ -1,10 +1,15 @@
-import { Prisma } from "@prisma/client";
+// app/lib/prisma/json.ts
+// DEPRECATED: Utilisez @/app/lib/supabase/helpers à la place
+// Ce fichier est conservé temporairement pour la compatibilité
 
-export function toJsonInput(
-  value: unknown
-): typeof Prisma.JsonNull | Prisma.InputJsonValue | undefined {
-  if (value === undefined) return undefined;
-  if (value === null) return Prisma.JsonNull;
-  return value as Prisma.InputJsonValue;
+/**
+ * Convertit une valeur en format JSONB pour Supabase
+ * @deprecated Utilisez toJsonInput de @/app/lib/supabase/helpers
+ */
+export function toJsonInput(value: unknown): unknown {
+  if (value === undefined) return null;
+  if (value === null) return null;
+  // Supabase accepte directement les objets JavaScript pour JSONB
+  return value;
 }
 

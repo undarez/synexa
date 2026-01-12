@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
+import { requireUser } from "@/app/lib/auth/mock";
 import { controlHueLight, controlHueGroup, convertToHueCommand } from "@/app/lib/domotique/hue";
-import prisma from "@/app/lib/prisma";
+import { supabase } from "@/app/lib/supabase/client";
 
 /**
  * POST - Contrôle une lumière ou un groupe Hue
@@ -22,13 +22,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Récupérer le device depuis la base
-    const device = await prisma.device.findFirst({
-      where: {
-        id: deviceId,
-        userId: user.id,
-        provider: "hue",
-      },
-    });
+    type DeviceData = { metadata: unknown; [key: string]: unknown };
+    const { data: device, error: deviceError } = await supabase
+      .from('Device')
+      .select('*')
+      .eq('id', deviceId)
+      .eq('userId', user.id)
+      .eq('provider', 'hue')
+      .single();
 
     if (!device) {
       return NextResponse.json(
@@ -37,7 +38,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const metadata = device.metadata as any;
+    const typedDevice = device as DeviceData;
+    const metadata = typedDevice.metadata as any;
     const bridgeIp = metadata?.bridgeIp;
     const username = metadata?.username;
     const hueId = metadata?.hueId; // ID de la lumière dans Hue
@@ -62,10 +64,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Mettre à jour lastSeenAt
-    await prisma.device.update({
-      where: { id: deviceId },
-      data: { lastSeenAt: new Date() },
-    });
+    await supabase
+      .from('Device')
+      // @ts-ignore - Supabase infère 'never' mais les données sont valides
+      .update({
+        lastSeenAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as any)
+      .eq('id', deviceId);
 
     return NextResponse.json({
       success,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncAllHealthSources } from "@/app/lib/health/sync";
-import prisma from "@/app/lib/prisma";
+import { supabase } from "@/app/lib/supabase/client";
 
 /**
  * POST - Synchronisation automatique (appelée par un cron job ou webhook)
@@ -17,21 +17,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Récupérer tous les utilisateurs avec synchronisation activée
-    const users = await prisma.user.findMany({
-      where: {
-        preferences: {
-          some: {
-            key: {
-              in: ["health_sync_apple_health", "health_sync_fitbit", "health_sync_withings", "health_sync_google_fit"],
-            },
-            value: {
-              path: ["enabled"],
-              equals: true,
-            } as any,
-          },
-        },
-      },
-    });
+    const { data: healthPreferences, error: prefsError } = await supabase
+      .from('Preference')
+      .select('userId')
+      .in('key', [
+        "health_sync_apple_health",
+        "health_sync_fitbit",
+        "health_sync_withings",
+        "health_sync_google_fit",
+      ])
+      .eq('value->>enabled', 'true');
+
+    if (prefsError) {
+      console.error("[health/sync/auto] Erreur récupération préférences", prefsError);
+    }
+
+    // Extraire les userId uniques
+    const userIds = [...new Set((healthPreferences || []).map((p: any) => p.userId))];
+    
+    // Récupérer les utilisateurs
+    const { data: users, error: usersError } = await supabase
+      .from('User')
+      .select('id')
+      .in('id', userIds);
+
+    if (usersError) {
+      console.error("[health/sync/auto] Erreur récupération utilisateurs", usersError);
+    }
 
     const results: Record<string, any> = {};
 

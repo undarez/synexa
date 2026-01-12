@@ -1,5 +1,5 @@
-import prisma from "@/app/lib/prisma";
-import { BillCategory, BillStatus } from "@prisma/client";
+import { supabase } from "@/app/lib/supabase/client";
+import { BillCategory, BillStatus } from "@/app/lib/supabase/types";
 
 export interface CreateBillInput {
   title: string;
@@ -48,24 +48,33 @@ export async function createBill(userId: string, input: CreateBillInput) {
   // Catégorisation automatique basée sur le titre et le provider
   const category = input.category || categorizeBill(input.title, input.provider);
 
-  const bill = await prisma.bill.create({
-    data: {
+  const now = new Date().toISOString();
+  const { data: bill, error } = await supabase
+    .from('Bill')
+    .insert({
       userId,
       title: input.title,
-      description: input.description,
+      description: input.description || null,
       category,
       amount: input.amount,
       currency: input.currency || "EUR",
-      dueDate,
-      provider: input.provider,
-      reference: input.reference,
+      dueDate: dueDate.toISOString(),
+      provider: input.provider || null,
+      reference: input.reference || null,
       reminderDays: input.reminderDays || 3,
       isRecurring: input.isRecurring || false,
-      recurrenceRule: input.recurrenceRule,
+      recurrenceRule: input.recurrenceRule || null,
       status,
-      metadata: input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : null,
-    },
-  });
+      metadata: input.metadata || null,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .select()
+    .single();
+
+  if (error || !bill) {
+    throw new Error(`Erreur lors de la création de la facture: ${error?.message}`);
+  }
 
   return bill;
 }
@@ -75,11 +84,14 @@ export async function createBill(userId: string, input: CreateBillInput) {
  */
 export async function updateBill(userId: string, billId: string, input: UpdateBillInput) {
   // Vérifier que la facture appartient à l'utilisateur
-  const existingBill = await prisma.bill.findFirst({
-    where: { id: billId, userId },
-  });
+  const { data: existingBill, error: fetchError } = await supabase
+    .from('Bill')
+    .select('*')
+    .eq('id', billId)
+    .eq('userId', userId)
+    .single();
 
-  if (!existingBill) {
+  if (fetchError || !existingBill) {
     throw new Error("Facture non trouvée");
   }
 
@@ -91,10 +103,11 @@ export async function updateBill(userId: string, billId: string, input: UpdateBi
   if (input.amount !== undefined) updateData.amount = input.amount;
   if (input.currency !== undefined) updateData.currency = input.currency;
   if (input.dueDate !== undefined) {
-    updateData.dueDate = typeof input.dueDate === "string" ? new Date(input.dueDate) : input.dueDate;
+    const dueDate = typeof input.dueDate === "string" ? new Date(input.dueDate) : input.dueDate;
+    updateData.dueDate = dueDate.toISOString();
   }
   if (input.paidDate !== undefined) {
-    updateData.paidDate = input.paidDate === null ? null : (typeof input.paidDate === "string" ? new Date(input.paidDate) : input.paidDate);
+    updateData.paidDate = input.paidDate === null ? null : (typeof input.paidDate === "string" ? new Date(input.paidDate) : input.paidDate).toISOString();
   }
   if (input.status !== undefined) updateData.status = input.status;
   if (input.provider !== undefined) updateData.provider = input.provider;
@@ -108,7 +121,7 @@ export async function updateBill(userId: string, billId: string, input: UpdateBi
 
   // Mettre à jour le statut automatiquement si nécessaire
   if (updateData.dueDate && !updateData.status) {
-    const dueDate = typeof updateData.dueDate === "string" ? new Date(updateData.dueDate) : updateData.dueDate;
+    const dueDate = new Date(updateData.dueDate);
     if (dueDate < new Date() && existingBill.status === BillStatus.PENDING) {
       updateData.status = BillStatus.OVERDUE;
     }
@@ -116,13 +129,23 @@ export async function updateBill(userId: string, billId: string, input: UpdateBi
 
   // Si la facture est marquée comme payée, mettre à jour la date de paiement
   if (updateData.status === BillStatus.PAID && !updateData.paidDate) {
-    updateData.paidDate = new Date();
+    updateData.paidDate = new Date().toISOString();
   }
 
-  const bill = await prisma.bill.update({
-    where: { id: billId },
-    data: updateData,
-  });
+  updateData.updatedAt = new Date().toISOString();
+
+  const { data: bill, error: updateError } = await supabase
+    .from('Bill')
+    // @ts-expect-error - Le type Database.Update est any, mais TypeScript ne l'infère pas correctement
+    .update(updateData)
+    .eq('id', billId)
+    .eq('userId', userId)
+    .select()
+    .single();
+
+  if (updateError || !bill) {
+    throw new Error(`Erreur lors de la mise à jour de la facture: ${updateError?.message}`);
+  }
 
   return bill;
 }
@@ -140,54 +163,81 @@ export async function getBills(
     offset?: number;
   }
 ) {
-  const where: any = { userId };
+  let query = supabase
+    .from('Bill')
+    .select('*')
+    .eq('userId', userId);
 
   if (options?.status) {
-    where.status = options.status;
+    query = query.eq('status', options.status);
   } else if (!options?.includePaid) {
-    where.status = { not: BillStatus.PAID };
+    query = query.neq('status', BillStatus.PAID);
   }
 
   if (options?.category) {
-    where.category = options.category;
+    query = query.eq('category', options.category);
   }
 
-  const bills = await prisma.bill.findMany({
-    where,
-    orderBy: { dueDate: "asc" },
-    take: options?.limit,
-    skip: options?.offset,
-  });
+  query = query.order('dueDate', { ascending: true });
 
-  return bills;
+  if (options?.limit) {
+    query = query.limit(options.limit);
+  }
+  if (options?.offset) {
+    query = query.range(options.offset, options.offset + (options.limit || 100) - 1);
+  }
+
+  const { data: bills, error } = await query;
+
+  if (error) {
+    throw new Error(`Erreur lors de la récupération des factures: ${error.message}`);
+  }
+
+  return bills || [];
 }
 
 /**
  * Récupère une facture par ID
  */
 export async function getBillById(userId: string, billId: string) {
-  const bill = await prisma.bill.findFirst({
-    where: { id: billId, userId },
-  });
+  const { data: bill, error } = await supabase
+    .from('Bill')
+    .select('*')
+    .eq('id', billId)
+    .eq('userId', userId)
+    .single();
 
-  return bill;
+  if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+    throw new Error(`Erreur lors de la récupération de la facture: ${error.message}`);
+  }
+
+  return bill || null;
 }
 
 /**
  * Supprime une facture
  */
 export async function deleteBill(userId: string, billId: string) {
-  const bill = await prisma.bill.findFirst({
-    where: { id: billId, userId },
-  });
+  const { data: bill, error: fetchError } = await supabase
+    .from('Bill')
+    .select('id')
+    .eq('id', billId)
+    .eq('userId', userId)
+    .single();
 
-  if (!bill) {
+  if (fetchError || !bill) {
     throw new Error("Facture non trouvée");
   }
 
-  await prisma.bill.delete({
-    where: { id: billId },
-  });
+  const { error: deleteError } = await supabase
+    .from('Bill')
+    .delete()
+    .eq('id', billId)
+    .eq('userId', userId);
+
+  if (deleteError) {
+    throw new Error(`Erreur lors de la suppression de la facture: ${deleteError.message}`);
+  }
 
   return true;
 }
@@ -210,19 +260,20 @@ export async function getUpcomingBills(userId: string, days: number = 7) {
   const futureDate = new Date();
   futureDate.setDate(today.getDate() + days);
 
-  const bills = await prisma.bill.findMany({
-    where: {
-      userId,
-      status: { in: [BillStatus.PENDING, BillStatus.OVERDUE] },
-      dueDate: {
-        gte: today,
-        lte: futureDate,
-      },
-    },
-    orderBy: { dueDate: "asc" },
-  });
+  const { data: bills, error } = await supabase
+    .from('Bill')
+    .select('*')
+    .eq('userId', userId)
+    .in('status', [BillStatus.PENDING, BillStatus.OVERDUE])
+    .gte('dueDate', today.toISOString())
+    .lte('dueDate', futureDate.toISOString())
+    .order('dueDate', { ascending: true });
 
-  return bills;
+  if (error) {
+    throw new Error(`Erreur lors de la récupération des factures à venir: ${error.message}`);
+  }
+
+  return bills || [];
 }
 
 /**
@@ -231,16 +282,19 @@ export async function getUpcomingBills(userId: string, days: number = 7) {
 export async function getOverdueBills(userId: string) {
   const today = new Date();
 
-  const bills = await prisma.bill.findMany({
-    where: {
-      userId,
-      status: BillStatus.OVERDUE,
-      dueDate: { lt: today },
-    },
-    orderBy: { dueDate: "asc" },
-  });
+  const { data: bills, error } = await supabase
+    .from('Bill')
+    .select('*')
+    .eq('userId', userId)
+    .eq('status', BillStatus.OVERDUE)
+    .lt('dueDate', today.toISOString())
+    .order('dueDate', { ascending: true });
 
-  return bills;
+  if (error) {
+    throw new Error(`Erreur lors de la récupération des factures en retard: ${error.message}`);
+  }
+
+  return bills || [];
 }
 
 /**
@@ -255,51 +309,65 @@ export async function getFinancialSummary(userId: string, month?: number, year?:
     ? new Date(year, month, 0)
     : new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-  const [totalPending, totalPaid, totalOverdue, billsByCategory] = await Promise.all([
-    prisma.bill.aggregate({
-      where: {
-        userId,
-        status: BillStatus.PENDING,
-        dueDate: { gte: startDate, lte: endDate },
-      },
-      _sum: { amount: true },
-    }),
-    prisma.bill.aggregate({
-      where: {
-        userId,
-        status: BillStatus.PAID,
-        paidDate: { gte: startDate, lte: endDate },
-      },
-      _sum: { amount: true },
-    }),
-    prisma.bill.aggregate({
-      where: {
-        userId,
-        status: BillStatus.OVERDUE,
-      },
-      _sum: { amount: true },
-    }),
-    prisma.bill.groupBy({
-      by: ["category"],
-      where: {
-        userId,
-        status: { in: [BillStatus.PENDING, BillStatus.OVERDUE] },
-        dueDate: { gte: startDate, lte: endDate },
-      },
-      _sum: { amount: true },
-      _count: true,
-    }),
-  ]);
+  // Récupérer toutes les factures pour calculer les agrégations
+  const { data: allBills, error: fetchError } = await supabase
+    .from('Bill')
+    .select('*')
+    .eq('userId', userId);
+
+  if (fetchError) {
+    throw new Error(`Erreur lors de la récupération des factures: ${fetchError.message}`);
+  }
+
+  const bills = allBills || [];
+
+  // Filtrer et calculer manuellement (Supabase ne supporte pas groupBy directement)
+  const pendingBills = bills.filter(
+    (b: any) => b.status === BillStatus.PENDING &&
+    new Date(b.dueDate) >= startDate &&
+    new Date(b.dueDate) <= endDate
+  );
+  const paidBills = bills.filter(
+    (b: any) => b.status === BillStatus.PAID &&
+    b.paidDate &&
+    new Date(b.paidDate) >= startDate &&
+    new Date(b.paidDate) <= endDate
+  );
+  const overdueBills = bills.filter((b: any) => b.status === BillStatus.OVERDUE);
+  const billsInPeriod = bills.filter(
+    (b: any) => 
+      [BillStatus.PENDING, BillStatus.OVERDUE].includes(b.status) &&
+      new Date(b.dueDate) >= startDate &&
+      new Date(b.dueDate) <= endDate
+  );
+
+  // Calculer les totaux
+  const totalPending = pendingBills.reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+  const totalPaid = paidBills.reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+  const totalOverdue = overdueBills.reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+
+  // Grouper par catégorie
+  const categoryMap = new Map<string, { total: number; count: number }>();
+  billsInPeriod.forEach((b: any) => {
+    const category = b.category || BillCategory.OTHER;
+    const existing = categoryMap.get(category) || { total: 0, count: 0 };
+    categoryMap.set(category, {
+      total: existing.total + (b.amount || 0),
+      count: existing.count + 1,
+    });
+  });
+
+  const byCategory = Array.from(categoryMap.entries()).map(([category, data]) => ({
+    category,
+    total: data.total,
+    count: data.count,
+  }));
 
   return {
-    totalPending: totalPending._sum.amount || 0,
-    totalPaid: totalPaid._sum.amount || 0,
-    totalOverdue: totalOverdue._sum.amount || 0,
-    byCategory: billsByCategory.map((item: { category: string; _sum: { amount: number | null }; _count: number }) => ({
-      category: item.category,
-      total: item._sum.amount || 0,
-      count: item._count,
-    })),
+    totalPending,
+    totalPaid,
+    totalOverdue,
+    byCategory,
   };
 }
 
@@ -412,22 +480,26 @@ function categorizeBill(title: string, provider?: string): BillCategory {
  * Met à jour automatiquement le statut des factures (appelé périodiquement)
  */
 export async function updateBillsStatus(userId?: string) {
-  const today = new Date();
-  const where: any = {
-    status: { in: [BillStatus.PENDING, BillStatus.OVERDUE] },
-    dueDate: { lt: today },
-  };
+  const today = new Date().toISOString();
+  
+  let query = supabase
+    .from('Bill')
+    .update({
+      status: BillStatus.OVERDUE,
+      updatedAt: new Date().toISOString(),
+    })
+    .in('status', [BillStatus.PENDING, BillStatus.OVERDUE])
+    .lt('dueDate', today);
 
   if (userId) {
-    where.userId = userId;
+    query = query.eq('userId', userId);
   }
 
-  await prisma.bill.updateMany({
-    where,
-    data: {
-      status: BillStatus.OVERDUE,
-    },
-  });
+  const { error } = await query;
+
+  if (error) {
+    throw new Error(`Erreur lors de la mise à jour du statut des factures: ${error.message}`);
+  }
 }
 
 

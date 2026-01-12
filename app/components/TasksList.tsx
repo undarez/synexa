@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { CheckSquare2, ArrowRight, AlertCircle, Clock, Zap, Briefcase, ShoppingBag, Heart, Wallet, Home, Users, BookOpen, MoreHorizontal } from "lucide-react";
-import type { Task, TaskPriority, TaskContext } from "@prisma/client";
+import type { Task, TaskPriority, TaskContext } from "@/app/lib/supabase/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
 import { Badge } from "@/app/components/ui/badge";

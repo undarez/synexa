@@ -3,7 +3,7 @@
 import { Sparkles, Sun, Car, Home, Moon } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { RoutineTriggerType, RoutineActionType } from "@prisma/client";
+import { RoutineTriggerType, RoutineActionType } from "@/app/lib/supabase/types";
 
 export interface RoutineTemplate {
   id: string;

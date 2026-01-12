@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
-import prisma from "@/app/lib/prisma";
-import { ReminderType, ReminderStatus } from "@prisma/client";
-import { toJsonInput } from "@/app/lib/prisma/json";
+import { requireUser, UnauthorizedError } from "@/app/lib/auth/mock";
+import { supabase } from "@/app/lib/supabase/client";
+import { ReminderType, ReminderStatus } from "@/app/lib/supabase/types";
 
 type ReminderUpdatePayload = {
   title?: string;
@@ -25,11 +24,15 @@ export async function PATCH(
     const { reminderId } = await params;
     const body = (await request.json()) as ReminderUpdatePayload;
 
-    const reminder = await prisma.reminder.findFirst({
-      where: { id: reminderId, userId: user.id },
-    });
+    // Récupérer le rappel
+    const { data: reminder, error: fetchError } = await supabase
+      .from('Reminder')
+      .select('*')
+      .eq('id', reminderId)
+      .eq('userId', user.id)
+      .single();
 
-    if (!reminder) {
+    if (fetchError || !reminder) {
       return NextResponse.json(
         { error: "Rappel introuvable" },
         { status: 404 }
@@ -43,10 +46,21 @@ export async function PATCH(
       );
     }
 
-    const updateData: any = {};
+    // Construire l'objet de mise à jour
+    const updateData: {
+      title?: string;
+      message?: string | null;
+      reminderType?: ReminderType;
+      includeTraffic?: boolean;
+      includeWeather?: boolean;
+      scheduledFor?: string;
+      updatedAt: string;
+    } = {
+      updatedAt: new Date().toISOString(),
+    };
 
     if (body.title !== undefined) updateData.title = body.title;
-    if (body.message !== undefined) updateData.message = body.message;
+    if (body.message !== undefined) updateData.message = body.message || null;
     if (body.reminderType !== undefined) updateData.reminderType = body.reminderType;
     if (body.includeTraffic !== undefined) updateData.includeTraffic = body.includeTraffic;
     if (body.includeWeather !== undefined) updateData.includeWeather = body.includeWeather;
@@ -59,13 +73,26 @@ export async function PATCH(
           { status: 400 }
         );
       }
-      updateData.scheduledFor = scheduledFor;
+      updateData.scheduledFor = scheduledFor.toISOString();
     }
 
-    const updated = await prisma.reminder.update({
-      where: { id: reminder.id },
-      data: updateData,
-    });
+    // Mettre à jour avec Supabase
+    const { data: updated, error: updateError } = await supabase
+      .from('Reminder')
+      // @ts-expect-error - Le type Database.Update est any, mais TypeScript ne l'infère pas correctement
+      .update(updateData)
+      .eq('id', reminder.id)
+      .eq('userId', user.id)
+      .select()
+      .single();
+
+    if (updateError || !updated) {
+      console.error('[PATCH /reminders/:id] Erreur Supabase:', updateError);
+      return NextResponse.json(
+        { error: 'Erreur lors de la mise à jour du rappel', details: updateError?.message },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ reminder: updated });
   } catch (error) {
@@ -91,11 +118,15 @@ export async function DELETE(
     const user = await requireUser();
     const { reminderId } = await params;
 
-    const reminder = await prisma.reminder.findFirst({
-      where: { id: reminderId, userId: user.id },
-    });
+    // Vérifier que le rappel existe
+    const { data: reminder, error: fetchError } = await supabase
+      .from('Reminder')
+      .select('id')
+      .eq('id', reminderId)
+      .eq('userId', user.id)
+      .single();
 
-    if (!reminder) {
+    if (fetchError || !reminder) {
       return NextResponse.json(
         { error: "Rappel introuvable" },
         { status: 404 }
@@ -103,10 +134,22 @@ export async function DELETE(
     }
 
     // Marquer comme annulé au lieu de supprimer (pour l'historique)
-    await prisma.reminder.update({
-      where: { id: reminder.id },
-      data: { status: ReminderStatus.CANCELLED },
-    });
+    const { error: updateError } = await supabase
+      .from('Reminder')
+      .update({
+        status: ReminderStatus.CANCELLED,
+        updatedAt: new Date().toISOString(),
+      })
+      .eq('id', reminder.id)
+      .eq('userId', user.id);
+
+    if (updateError) {
+      console.error('[DELETE /reminders/:id] Erreur Supabase:', updateError);
+      return NextResponse.json(
+        { error: 'Erreur lors de l\'annulation du rappel', details: updateError.message },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

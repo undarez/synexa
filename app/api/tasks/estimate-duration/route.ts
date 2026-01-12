@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/app/lib/auth/session";
+import { requireUser } from "@/app/lib/auth/mock";
 import { estimateTaskDuration } from "@/app/lib/tasks/duration-estimator";
-import type { TaskContext, TaskPriority } from "@prisma/client";
+import type { TaskContext, TaskPriority } from "@/app/lib/supabase/types";
 
 /**
  * GET - Estime la durée d'une tâche basée sur l'historique

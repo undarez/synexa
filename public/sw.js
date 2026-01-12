@@ -99,16 +99,16 @@ self.addEventListener("fetch", (event) => {
   try {
     const url = new URL(request.url);
 
-    // ✅ CRITIQUE : IGNORER COMPLÈTEMENT les routes NextAuth - NE PAS les intercepter
-    // Selon la documentation officielle NextAuth.js, les routes /api/auth/* ne doivent
-    // JAMAIS être interceptées par le Service Worker pour garantir le bon fonctionnement
-    // de l'authentification OAuth (Google, Facebook, etc.)
-    // 
-    // Ne pas appeler event.respondWith() = la requête passe directement au réseau
-    // sans aucune intervention du SW, ce qui est essentiel pour les callbacks OAuth
-    if (url.pathname.startsWith("/api/auth/")) {
-      // Ne rien faire = la requête passe directement au serveur Next.js
-      // C'est la méthode recommandée par la documentation officielle NextAuth.js
+    // ✅ CRITIQUE : IGNORER COMPLÈTEMENT les routes OAuth - NE PAS les intercepter
+    // Les routes /api/auth/* ne doivent JAMAIS être interceptées
+    // Les URLs avec access_token dans query params ou hash non plus (callback OAuth Supabase)
+    if (url.pathname.startsWith("/api/auth/") || 
+        url.search.includes("access_token") || 
+        url.search.includes("code=") ||
+        url.hash.includes("access_token") ||
+        url.hash.includes("code=")) {
+      // Ne rien faire = la requête passe directement au réseau
+      // Sans aucune intervention du SW, ce qui est essentiel pour les callbacks OAuth
       return; // Sortir immédiatement, ne pas intercepter
     }
 

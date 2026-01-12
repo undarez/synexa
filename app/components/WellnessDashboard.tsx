@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Heart, Moon, Activity, Droplet, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { HealthMetricType } from "@prisma/client";
+import { HealthMetricType } from "@/app/lib/supabase/types";
 
 interface HealthMetricsSummary {
   type: HealthMetricType;

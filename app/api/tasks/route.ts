@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/app/lib/prisma";
-import { requireUser, UnauthorizedError } from "@/app/lib/auth/session";
+import { supabase } from "@/app/lib/supabase/client";
+import { requireUser, UnauthorizedError } from "@/app/lib/auth/mock";
 import { trackActivity } from "@/app/lib/learning/tracker";
-import type { Task, Prisma, TaskPriority, TaskContext } from "@prisma/client";
+import { generateId } from "@/app/lib/supabase/helpers";
+import type { Task, TaskPriority, TaskContext } from "@/app/lib/supabase/types";
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,18 +15,22 @@ export async function GET(request: NextRequest) {
     const context = searchParams.get("context");
     const groupBy = searchParams.get("groupBy"); // "priority" | "context" | "due"
 
-    const where: Prisma.TaskWhereInput = { userId: user.id };
+    // Construire la requête Supabase
+    let query = supabase
+      .from('Task')
+      .select('*')
+      .eq('userId', user.id);
 
     // Filtre par complétion
     if (completed !== null) {
-      where.completed = completed === "true";
+      query = query.eq('completed', completed === "true");
     }
 
     // Filtre par priorité
     if (priority) {
       const validPriorities: TaskPriority[] = ["HIGH", "MEDIUM", "LOW"];
       if (validPriorities.includes(priority as TaskPriority)) {
-        where.priority = priority as TaskPriority;
+        query = query.eq('priority', priority);
       }
     }
 
@@ -33,7 +38,7 @@ export async function GET(request: NextRequest) {
     if (context) {
       const validContexts: TaskContext[] = ["PERSONAL", "WORK", "SHOPPING", "HEALTH", "OTHER"];
       if (validContexts.includes(context as TaskContext)) {
-        where.context = context as TaskContext;
+        query = query.eq('context', context);
       }
     }
 
@@ -45,23 +50,34 @@ export async function GET(request: NextRequest) {
         startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date(dueDate);
         endOfDay.setHours(23, 59, 59, 999);
-        where.due = { gte: startOfDay, lte: endOfDay };
+        query = query
+          .gte('due', startOfDay.toISOString())
+          .lte('due', endOfDay.toISOString());
       }
     }
 
-    const tasks = await prisma.task.findMany({
-      where,
-      orderBy: [
-        { priority: "desc" }, // HIGH en premier
-        { due: { sort: "asc", nulls: "last" } },
-        { createdAt: "desc" },
-      ],
-    });
+    // Ajouter le tri (Supabase nécessite plusieurs appels order)
+    query = query
+      .order('priority', { ascending: false }) // HIGH en premier
+      .order('due', { ascending: true, nullsFirst: false })
+      .order('createdAt', { ascending: false });
+
+    // Exécuter la requête
+    const { data: tasks, error } = await query;
+
+    // Gérer les erreurs Supabase
+    if (error) {
+      console.error('[API Tasks GET] Erreur Supabase:', error);
+      return NextResponse.json(
+        { error: 'Erreur lors de la récupération des tâches', details: error.message },
+        { status: 500 }
+      );
+    }
 
     // Regroupement intelligent si demandé
     if (groupBy) {
-      const grouped: Record<string, typeof tasks> = {};
-      tasks.forEach((task: Task) => {
+      const grouped: Record<string, Task[]> = {};
+      (tasks || []).forEach((task: Task) => {
         let key = "";
         if (groupBy === "priority") {
           key = task.priority;
@@ -80,10 +96,10 @@ export async function GET(request: NextRequest) {
         }
         grouped[key].push(task);
       });
-      return NextResponse.json({ tasks, grouped });
+      return NextResponse.json({ tasks: tasks || [], grouped });
     }
 
-    return NextResponse.json({ tasks });
+    return NextResponse.json({ tasks: tasks || [] });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: error.message }, { status: 401 });
@@ -108,8 +124,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const task = await prisma.task.create({
-      data: {
+    // Créer la tâche avec Supabase
+    const now = new Date().toISOString();
+    const taskId = generateId();
+    
+    const { data: task, error: createError } = await supabase
+      .from('Task')
+      .insert({
+        id: taskId,
         userId: user.id,
         title: body.title.trim(),
         description: body.description?.trim() || null,
@@ -117,10 +139,29 @@ export async function POST(request: NextRequest) {
         context: body.context || "PERSONAL",
         estimatedDuration: body.estimatedDuration ? parseInt(body.estimatedDuration) : null,
         energyLevel: body.energyLevel || null,
-        due: body.due ? new Date(body.due) : null,
+        due: body.due ? new Date(body.due).toISOString() : null,
         completed: body.completed || false,
-      },
-    });
+        createdAt: now,
+        updatedAt: now,
+      })
+      .select()
+      .single();
+
+    // Gérer les erreurs
+    if (createError) {
+      console.error('[API Tasks POST] Erreur Supabase:', createError);
+      return NextResponse.json(
+        { error: 'Erreur lors de la création de la tâche', details: createError.message },
+        { status: 500 }
+      );
+    }
+
+    if (!task) {
+      return NextResponse.json(
+        { error: 'Aucune tâche créée' },
+        { status: 500 }
+      );
+    }
 
     // Tracker l'activité
     await trackActivity(

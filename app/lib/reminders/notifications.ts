@@ -1,5 +1,5 @@
-import prisma from "@/app/lib/prisma";
-import { ReminderType, ReminderStatus } from "@prisma/client";
+import { supabase } from "@/app/lib/supabase/client";
+import { ReminderType, ReminderStatus } from "@/app/lib/supabase/types";
 import { sendEmail, formatReminderEmail } from "@/app/lib/services/email";
 import { sendPushNotification as sendPush } from "@/app/lib/services/push";
 import { sendSMS } from "@/app/lib/services/sms";
@@ -16,15 +16,18 @@ interface NotificationResult {
 export async function sendReminderNotification(
   reminderId: string
 ): Promise<NotificationResult> {
-  const reminder = await prisma.reminder.findUnique({
-    where: { id: reminderId },
-    include: {
-      user: true,
-      calendarEvent: true,
-    },
-  });
+  // Récupérer le rappel depuis Supabase
+  const { data: reminder, error: reminderError } = await supabase
+    .from("Reminder")
+    .select(`
+      *,
+      user:User(*),
+      calendarEvent:CalendarEvent(*)
+    `)
+    .eq("id", reminderId)
+    .single();
 
-  if (!reminder) {
+  if (reminderError || !reminder) {
     return { success: false, error: "Rappel introuvable" };
   }
 
@@ -37,35 +40,38 @@ export async function sendReminderNotification(
 
     switch (reminder.reminderType) {
       case ReminderType.PUSH:
-        result = await sendPushNotification(reminder);
+        result = await sendPushNotification(reminder as any);
         break;
       case ReminderType.EMAIL:
-        result = await sendEmailNotification(reminder);
+        result = await sendEmailNotification(reminder as any);
         break;
       case ReminderType.SMS:
-        result = await sendSMSNotification(reminder);
+        result = await sendSMSNotification(reminder as any);
         break;
       default:
         return { success: false, error: "Type de notification non supporté" };
     }
 
     // Mettre à jour le statut du rappel
-    await prisma.reminder.update({
-      where: { id: reminderId },
-      data: {
+    const { error: updateError } = await supabase
+      .from("Reminder")
+      .update({
         status: result.success ? ReminderStatus.SENT : ReminderStatus.FAILED,
-        sentAt: result.success ? new Date() : null,
-      },
-    });
+        sentAt: result.success ? new Date().toISOString() : null,
+      })
+      .eq("id", reminderId);
+
+    if (updateError) {
+      console.error("[Notifications] Erreur mise à jour rappel:", updateError);
+    }
 
     return result;
   } catch (error) {
-    await prisma.reminder.update({
-      where: { id: reminderId },
-      data: {
-        status: ReminderStatus.FAILED,
-      },
-    });
+    // Mettre à jour le statut en cas d'erreur
+    await supabase
+      .from("Reminder")
+      .update({ status: ReminderStatus.FAILED })
+      .eq("id", reminderId);
 
     return {
       success: false,

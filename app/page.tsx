@@ -1,10 +1,8 @@
-import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/app/lib/auth/session";
-import Link from "next/link";
-import { Button } from "@/app/components/ui/button";
 import { Footer } from "@/app/components/Footer";
-import { HeroSection } from "@/app/components/HeroSection";
-import { AuthMenu } from "@/app/components/auth/AuthMenu";
+import { HomeNavigation } from "@/app/components/HomeNavigation";
+import { HomeHeroSection } from "@/app/components/HomeHeroSection";
+import { HomeCTASection } from "@/app/components/HomeCTASection";
+import { AuthSyncHandler } from "@/app/components/AuthSyncHandler";
 
 export const dynamic = 'force-dynamic';
 import {
@@ -16,7 +14,6 @@ import {
   Wifi,
   Bell,
   Sparkles,
-  ArrowRight,
   AlertCircle,
 } from "lucide-react";
 
@@ -30,17 +27,8 @@ export default async function HomePage({
 }: {
   searchParams?: Promise<{ error?: string; redirect?: string }>;
 }) {
-  const user = await getCurrentUser();
   const params = searchParams ? await searchParams : {};
 
-  // Ne pas rediriger automatiquement - permettre à l'utilisateur de voir la landing page
-  // même s'il est connecté (utile pour cliquer sur le logo "Synexa")
-  // Si on a un paramètre redirect explicite, rediriger vers cette page
-  if (params?.redirect && user) {
-    redirect(params.redirect);
-  }
-
-  // Afficher la landing page
   // Afficher un message d'erreur si présent
   const showAuthError = params?.error === "auth_required";
 
@@ -97,6 +85,9 @@ export default async function HomePage({
 
   return (
     <div className="min-h-screen bg-[hsl(var(--background))]">
+      {/* Handler pour synchroniser l'utilisateur après OAuth */}
+      <AuthSyncHandler />
+      
       {/* Message d'erreur d'authentification */}
       {showAuthError && (
         <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
@@ -115,42 +106,10 @@ export default async function HomePage({
       )}
 
       {/* Navigation */}
-      <nav className="border-b border-[hsl(var(--border))] bg-[hsl(var(--background))] backdrop-blur-sm shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <Link
-              href="/"
-              className="text-xl font-bold bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--gradient-end))] bg-clip-text text-transparent hover:opacity-80 transition-opacity"
-            >
-              Synexa
-            </Link>
-            <div className="flex items-center gap-4">
-              <Link
-                href="/about"
-                className="text-sm text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--primary))]"
-              >
-                En savoir plus
-              </Link>
-              <Link
-                href="/contact"
-                className="text-sm text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--primary))]"
-              >
-                Contact
-              </Link>
-              {user ? (
-                <Link href="/dashboard">
-                  <Button size="sm">Aller au dashboard</Button>
-                </Link>
-              ) : (
-                <AuthMenu />
-              )}
-            </div>
-          </div>
-        </div>
-      </nav>
+      <HomeNavigation />
 
       {/* Hero Section */}
-      <HeroSection user={user} />
+      <HomeHeroSection />
 
       {/* Features Section */}
       <section className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
@@ -187,34 +146,7 @@ export default async function HomePage({
       </section>
 
       {/* CTA Section */}
-      <section className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
-        <div className="rounded-2xl border border-[hsl(var(--border))] bg-gradient-to-br from-[hsl(var(--primary))] to-[hsl(var(--gradient-end))] p-12 text-center shadow-soft-lg">
-          <h2 className="mb-4 text-3xl font-bold text-white sm:text-4xl">
-            Prêt à commencer ?
-          </h2>
-          <p className="mb-8 text-lg text-white/90">
-            {user 
-              ? "Bienvenue sur Synexa ! Accédez à votre dashboard pour commencer."
-              : "Rejoignez Synexa et transformez votre façon de vous organiser."
-            }
-          </p>
-          {user ? (
-            <Link href="/dashboard">
-              <Button size="lg" variant="secondary">
-                Aller au dashboard
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
-          ) : (
-            <Link href="/auth/signin">
-              <Button size="lg" variant="secondary">
-                Créer un compte gratuit
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
-          )}
-        </div>
-      </section>
+      <HomeCTASection />
 
       <Footer />
     </div>
