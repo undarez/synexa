@@ -29,6 +29,12 @@ export function HomeNavigation() {
           </Link>
           <div className="flex items-center gap-4">
             <Link
+              href="/pricing"
+              className="text-sm text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--primary))]"
+            >
+              Tarifs
+            </Link>
+            <Link
               href="/about"
               className="text-sm text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--primary))]"
             >

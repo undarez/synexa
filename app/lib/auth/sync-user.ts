@@ -56,6 +56,17 @@ export async function syncSupabaseUserToUserTable(authUser: SupabaseAuthUser) {
       console.log('[Sync User] Utilisateur créé dans la table User:', newUser.id);
     }
 
+    // Initialiser l'abonnement FREE pour le nouvel utilisateur
+    try {
+      const { initUserSubscription } = await import('@/app/lib/hooks/use-init-subscription');
+      await initUserSubscription(newUser.id);
+    } catch (subscriptionError) {
+      // Ne pas faire échouer la création de l'utilisateur si l'initialisation de l'abonnement échoue
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Sync User] Erreur initialisation abonnement:', subscriptionError);
+      }
+    }
+
     return newUser;
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {

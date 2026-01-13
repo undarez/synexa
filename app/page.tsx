@@ -2,6 +2,7 @@ import { Footer } from "@/app/components/Footer";
 import { HomeNavigation } from "@/app/components/HomeNavigation";
 import { HomeHeroSection } from "@/app/components/HomeHeroSection";
 import { HomeCTASection } from "@/app/components/HomeCTASection";
+import { HomePricingSection } from "@/app/components/HomePricingSection";
 import { AuthSyncHandler } from "@/app/components/AuthSyncHandler";
 
 export const dynamic = 'force-dynamic';
@@ -34,52 +35,64 @@ export default async function HomePage({
 
   const features = [
     {
-      icon: Calendar,
-      title: "Calendrier Intelligent",
+      icon: Wifi,
+      title: "Domotique",
       description:
-        "Gérez tous vos événements et rendez-vous. Synchronisation avec Google Calendar et création en langage naturel.",
-    },
-    {
-      icon: CheckSquare,
-      title: "Tâches Organisées",
-      description:
-        "Priorités, contextes, durée estimée. Organisez vos tâches de manière intelligente avec regroupement automatique.",
+        "Contrôlez vos devices IoT (lumières, thermostats, volets). Support multi-vendors (Hue, Home Assistant, MQTT).",
     },
     {
       icon: Zap,
       title: "Automatisations",
       description:
-        "Créez des routines personnalisées. Contrôlez vos devices, créez des tâches, déclenchez des actions automatiquement.",
+        "Créez des routines intelligentes. Déclenchez des actions selon l'heure, la localisation, ou des événements.",
     },
     {
-      icon: Mic,
-      title: "Commandes Vocales",
+      icon: AlertCircle,
+      title: "Sécurité",
       description:
-        "Parlez à votre assistant. Créez des événements, des tâches et des routines simplement en parlant.",
-    },
-    {
-      icon: Cloud,
-      title: "Météo & Géolocalisation",
-      description:
-        "Consultez la météo en temps réel basée sur votre position. Carte interactive avec prévisions.",
-    },
-    {
-      icon: Wifi,
-      title: "Domotique",
-      description:
-        "Découvrez et contrôlez vos devices WiFi et Bluetooth automatiquement. Intégration avec vos automatisations.",
-    },
-    {
-      icon: Bell,
-      title: "Notifications Multi-canal",
-      description:
-        "Recevez des notifications par email, push et SMS. Rappels intelligents avec contexte météo et trafic.",
+        "Surveillance avancée avec caméras, détecteurs de mouvement, alertes en temps réel et journal d'événements.",
     },
     {
       icon: Sparkles,
-      title: "Brief Quotidien",
+      title: "Assistant IA",
       description:
-        "Résumé intelligent de votre journée avec suggestions proactives, météo, tâches prioritaires et rappels.",
+        "Grok intégré pour des conversations naturelles. Créez des événements, des tâches et contrôlez votre maison en langage naturel.",
+    },
+    {
+      icon: Mic,
+      title: "Voix",
+      description:
+        "Commandes vocales pour contrôler votre maison. Assistant vocal complet disponible avec les plans Plus et Pro.",
+    },
+    {
+      icon: Calendar,
+      title: "Calendrier & Organisation",
+      description:
+        "Gérez vos événements, rendez-vous et rappels. Synchronisation Google Calendar, rappels intelligents avec météo et trafic.",
+    },
+    {
+      icon: CheckSquare,
+      title: "Tâches & Rappels",
+      description:
+        "Organisez vos tâches avec priorités et contextes. Rappels multi-canal (email, push, SMS) avec contexte intelligent.",
+    },
+    {
+      icon: Cloud,
+      title: "Météo & Trafic",
+      description:
+        "Météo en temps réel basée sur votre position. Informations trafic pour vos déplacements.",
+    },
+    {
+      icon: Wifi,
+      title: "Consommation Électrique",
+      description:
+        "Suivez votre consommation d'énergie. Intégration Enedis et SICEA pour un suivi détaillé de vos factures.",
+    },
+    {
+      icon: Sparkles,
+      title: "Finance Personnelle",
+      description:
+        "Gérez vos dépenses, revenus et factures. Suivi budgétaire et alertes de paiement automatiques.",
     },
   ];
 
@@ -144,6 +157,9 @@ export default async function HomePage({
           })}
         </div>
       </section>
+
+      {/* Pricing Section */}
+      <HomePricingSection />
 
       {/* CTA Section */}
       <HomeCTASection />

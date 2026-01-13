@@ -1,30 +1,31 @@
+/**
+ * Page d'inscription
+ */
+
 "use client";
 
 import { useAuth } from "@/app/lib/auth/use-auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { SignInButton } from "@/app/components/auth/SignInButton";
-import { EmailSignInForm } from "@/app/components/auth/EmailSignInForm";
+import { EmailSignUpForm } from "@/app/components/auth/EmailSignUpForm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
-import { GoogleTokensDisplay } from "@/app/components/auth/GoogleTokensDisplay";
 import Link from "next/link";
 
-export default function SignInPage() {
+export default function SignUpPage() {
   const { user, session, loading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
     // IMPORTANT: Ne jamais rediriger si loading === true
-    // Attendre que la session soit hydratée avant de prendre des décisions
     if (loading) {
       return;
     }
 
-    // Si l'utilisateur est connecté ET qu'on a une session valide, rediriger vers le dashboard
-    // Ne pas rediriger si user === null au premier render - attendre loading === false
+    // Si l'utilisateur est déjà connecté, rediriger vers le dashboard
     if (user && session) {
-      const redirectTo = searchParams.get("redirect") || searchParams.get("redirect_to") || "/dashboard";
+      const redirectTo = searchParams.get("redirect") || "/dashboard";
       router.replace(redirectTo);
     }
   }, [user, session, loading, router, searchParams]);
@@ -45,16 +46,16 @@ export default function SignInPage() {
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black p-4">
       <div className="w-full max-w-md rounded-lg border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <h1 className="mb-2 text-2xl font-semibold text-black dark:text-zinc-50">
-          Connexion à Synexa
+          Créer un compte
         </h1>
         
         <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
-          Choisissez votre méthode de connexion
+          Choisissez votre méthode d'inscription
         </p>
 
         {error && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200">
-            <p className="font-medium">Erreur d'authentification</p>
+            <p className="font-medium">Erreur d'inscription</p>
             <p className="mt-1">{errorMessage || error}</p>
           </div>
         )}
@@ -66,25 +67,23 @@ export default function SignInPage() {
           </TabsList>
           <TabsContent value="google" className="space-y-4">
             <SignInButton />
-            {/* Affichage des tokens Google (mode développement uniquement) */}
-            <GoogleTokensDisplay />
           </TabsContent>
           <TabsContent value="email" className="space-y-4">
-            <EmailSignInForm />
+            <EmailSignUpForm />
           </TabsContent>
         </Tabs>
 
         <div className="mt-4 text-center">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Pas encore de compte ?{" "}
-            <Link href="/auth/signup" className="text-primary hover:underline">
-              S'inscrire
+            Déjà un compte ?{" "}
+            <Link href="/auth/signin" className="text-primary hover:underline">
+              Se connecter
             </Link>
           </p>
         </div>
 
         <p className="mt-4 text-center text-xs text-zinc-500 dark:text-zinc-400">
-          En vous connectant, vous acceptez nos conditions d'utilisation et notre politique de confidentialité.
+          En vous inscrivant, vous acceptez nos conditions d'utilisation et notre politique de confidentialité.
         </p>
       </div>
     </div>

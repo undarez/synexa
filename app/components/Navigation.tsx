@@ -234,6 +234,12 @@ export function Navigation() {
           <div className="flex items-center gap-4">
             <nav className="hidden gap-4 sm:flex">
               <Link
+                href="/pricing"
+                className="text-sm font-medium text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--primary))]"
+              >
+                Tarifs
+              </Link>
+              <Link
                 href="/about"
                 className="text-sm font-medium text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--primary))]"
               >
@@ -372,6 +378,13 @@ export function Navigation() {
             >
               <Bot className="h-5 w-5" />
               Synexa
+            </Link>
+            <Link
+              href="/pricing"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
+            >
+              Tarifs
             </Link>
             <Link
               href="/about"

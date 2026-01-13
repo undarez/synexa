@@ -33,7 +33,12 @@ const publicRoutes = [
   "/auth/signin",
   "/auth/signup",
   "/auth/error",
+  "/auth/callback",
+  "/auth/reset-password",
+  "/unauthorized",
+  "/forbidden",
   "/contact",
+  "/pricing",
   "/api/push/vapid-key",
 ];
 
@@ -117,12 +122,30 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith(route)
   );
 
-  // Si c'est une route protégée et qu'il n'y a pas d'utilisateur authentifié, rediriger vers la page de connexion
+  // Si c'est une route protégée et qu'il n'y a pas d'utilisateur authentifié
   if (isProtectedRoute && !user) {
+    // Rediriger vers la page 401 (non autorisé)
     const url = request.nextUrl.clone();
-    url.pathname = "/auth/signin";
+    url.pathname = "/unauthorized";
     url.searchParams.set("redirect", pathname);
     return NextResponse.redirect(url);
+  }
+
+  // Vérifier les routes admin (nécessitent un rôle admin)
+  if (pathname.startsWith("/admin")) {
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/unauthorized";
+      return NextResponse.redirect(url);
+    }
+    
+    // Vérifier le rôle admin via l'email
+    const { isAdmin } = await import("@/app/lib/auth/admin");
+    if (!isAdmin(user.email)) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/forbidden";
+      return NextResponse.redirect(url);
+    }
   }
 
   return response;
